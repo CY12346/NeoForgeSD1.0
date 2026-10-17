@@ -2,7 +2,7 @@
 
 本地 Stable Diffusion **出图编排层**：双后端客户端 + 批量出图调度器 + MCP 桥。
 
-> 这不是 Forge 或 ComfyUI 的分支。NeoForgeSD 是一层**独立于引擎之上**的编排代码，通过 HTTP API 驱动你已经装好的 Forge WebUI / ComfyUI，把「镜头表」变成「一批落盘的图」。它**不含任何模型权重**，模型由你自己下载并遵守其各自许可。
+> 这不是 Forge 或 ComfyUI 的分支。NeoForgeSD 是一层**独立于引擎之上**的编排代码，通过 HTTP API 驱动你已经装好的 NeoForge WebUI（Forge Classic 兼容）/ ComfyUI，把「镜头表」变成「一批落盘的图」。它**不含任何模型权重**，模型由你自己下载并遵守其各自许可。
 
 ---
 
@@ -18,7 +18,7 @@ python manhua.py --shots shots.json --backend comfy --out out_dir --limit 10
 
 | 模块 | 文件 | 作用 |
 |---|---|---|
-| 双后端客户端 | `core/comfy_client.py` `core/sdclient.py` | 封装 ComfyUI(`:8188`) 与 Forge WebUI(`:7860`) 的 HTTP API，把实测踩过的坑固化进去 |
+| 双后端客户端 | `core/comfy_client.py` `core/sdclient.py` | 封装 ComfyUI(`:8188`) 与 NeoForge WebUI(`:7860`) 的 HTTP API，把实测踩过的坑固化进去 |
 | 出图调度器 | `manhua.py` | 镜头表 → 批量出图 → 命名落盘 + manifest.json |
 | MCP 桥 | `bridge/` | 把本机 AIGC 能力（SD 出图 / ComfyUI / ffmpeg / Blender / 语音）暴露成 MCP 工具给 AI Agent |
 
@@ -31,7 +31,7 @@ python manhua.py --shots shots.json --backend comfy --out out_dir --limit 10
       │
       ▼
   manhua.py  ──┬── ComfyBackend ──► core/comfy_client.py ──► ComfyUI :8188  (DiT 模型，如 Anima)
-               └── ForgeBackend ──► core/sdclient.py    ──► Forge   :7860  (SD1.5/SDXL/Illustrious)
+               └── NeoForgeBackend ──► core/sdclient.py ──► NeoForge :7860 (SD1.5/SDXL/Illustrious)
       │
       ▼
   一批 PNG + manifest.json（逐镜 seed / 耗时 / 路径）
@@ -85,8 +85,8 @@ node server.mjs   # 走 stdio JSON-RPC，由 MCP 客户端拉起
 
 | 后端 | 地址 | 适用模型 | 备注 |
 |---|---|---|---|
-| ComfyUI 0.41.0 | `:8188` | DiT 模型（Anima 等 Forge 加载不了的） | 需 torch ≥ 2.8 才开 DynamicVRAM |
-| Forge WebUI | `:7860` | SD1.5 / SDXL / Illustrious | 采样器名**不带** `Karras` 后缀，调度器单独传 |
+| ComfyUI 0.41.0 | `:8188` | DiT 模型（Anima 等 NeoForge 加载不了的） | 需 torch ≥ 2.8 才开 DynamicVRAM |
+| NeoForge WebUI（Forge Classic 兼容） | `:7860` | SD1.5 / SDXL / Illustrious | 采样器名**不带** `Karras` 后缀，调度器单独传 |
 
 ### 3. 4GB 显存跑 SDXL：fp8 拆分（降显存）
 

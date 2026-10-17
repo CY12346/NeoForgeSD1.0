@@ -3,9 +3,9 @@
 """
 manhua_engine · SD 客户端内核（可复用层）
 =========================================
-把本机 Forge Classic 的实测脾气固化在这里，上层脚本一律用它，不再各自踩坑。
+把本机 NeoForge 后端（Forge Classic 兼容 WebUI）的实测脾气固化在这里，上层脚本一律用它，不再各自踩坑。
 
-实测坑（2026-10-16，本机 Forge Classic + RTX3050 4GB）：
+实测坑（2026-10-16，本机 NeoForge WebUI（Forge Classic）+ RTX3050 4GB）：
  1. `sd_model_checkpoint` 只认 **不带目录、不带扩展名** 的基名：
       "Illustrious-XL-v0.1"                    -> 200 ✅
       "SDXL\\Illustrious-XL-v0.1.safetensors"   -> 422 not found
@@ -14,7 +14,7 @@ manhua_engine · SD 客户端内核（可复用层）
     但切换其实已成功 → 必须先读回、相同即跳过。
  3. 服务刚启动的极短时间内 POST 会返回 404（路由尚未注册齐）→ 需要重试。
  4. LoRA 用 `<lora:文件名不带扩展名:权重>` 写在正向 prompt 里。
- 5. **采样器名不带 "Karras" 后缀**（这个 Forge 把调度器分开了）：
+ 5. **采样器名不带 "Karras" 后缀**（这个 NeoForge WebUI 把调度器分开了）：
       "DPM++ 2M Karras" -> 404 Sampler not found  ← 一路"神秘 404"的真身
       "DPM++ 2M" + scheduler "karras" -> 正常
     所以出图前一律用 samplers()/schedulers() 的真实名单校验。

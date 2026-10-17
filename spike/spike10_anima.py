@@ -22,11 +22,11 @@ os.makedirs(OUT, exist_ok=True)
 TEMPLATE = "D:/AIGC/comfyui/_anima_prompt.json"
 
 UNET = "anima-turbo-v1.1.safetensors"
-POS = ("masterpiece, best quality, score_7, safe. An anime boy with short messy "
+POS = ("masterpiece, best quality. An anime boy with short messy "
        "black hair and purple eyes, wearing a white shirt, standing behind the "
        "counter of a small flower shop, buckets of colorful flowers around him, "
        "warm afternoon sunlight through the window, upper body, looking slightly away.")
-NEG = "worst quality, low quality, score_1, score_2, score_3, blurry, jpeg artifacts, sepia"
+NEG = "worst quality, low quality, blurry, jpeg artifacts, sepia"
 
 
 def build(w=768, h=1344, steps=30, cfg=4.0, sampler="er_sde", scheduler="simple",

@@ -40,7 +40,7 @@ const CFG = {
   // --skip-install: the extension "install requirements" step downgrades ml_dtypes
   //   and breaks startup (the classic "no attribute float8_e3m4" crash).
   // 2026-10-16 修复：--opt-sdp-attention 被移除。
-  //   Forge Classic 的 launch.py 直接报 "unrecognized arguments: --opt-sdp-attention"，
+  //   NeoForge WebUI（Forge Classic）的 launch.py 直接报 "unrecognized arguments: --opt-sdp-attention"，
   //   导致 sd_start 永远起不来（SD 从未真正启动）。且它已无必要：
   //   xformers 0.0.25.post1+cu118 现已装好，启动日志会打印
   //   "xformers version: 0.0.25.post1+cu118"，自动生效。
@@ -419,7 +419,7 @@ const TOOLS = [
         steps: { type: "integer", default: 24 },
         cfg_scale: { type: "number", default: 7 },
         sampler_name: { type: "string", default: "DPM++ 2M" },
-        scheduler: { type: "string", default: "karras", description: "Forge scheduler. Sampler name must NOT carry the Karras suffix (that 404s)." },
+        scheduler: { type: "string", default: "karras", description: "NeoForge scheduler. Sampler name must NOT carry the Karras suffix (that 404s)." },
         seed: { type: "integer", default: -1, description: "-1 = random" },
         batch_size: { type: "integer", default: 1 },
         n_iter: { type: "integer", default: 1 },
@@ -444,7 +444,7 @@ const TOOLS = [
         steps: { type: "integer", default: 24 },
         cfg_scale: { type: "number", default: 7 },
         sampler_name: { type: "string", default: "DPM++ 2M" },
-        scheduler: { type: "string", default: "karras", description: "Forge scheduler." },
+        scheduler: { type: "string", default: "karras", description: "NeoForge scheduler." },
         width: { type: "integer", default: 0, description: "0 = keep source size" },
         height: { type: "integer", default: 0 },
         seed: { type: "integer", default: -1 },
@@ -529,7 +529,7 @@ const TOOLS = [
         steps: { type: "integer", default: 20 },
         cfg_scale: { type: "number", default: 7 },
         sampler_name: { type: "string", default: "DPM++ 2M" },
-        scheduler: { type: "string", default: "karras", description: "Forge scheduler." },
+        scheduler: { type: "string", default: "karras", description: "NeoForge scheduler." },
         seed: { type: "integer", default: -1 },
         out_name: { type: "string" },
       },
@@ -652,7 +652,7 @@ const TOOLS = [
   {
     name: "comfy_generate",
     description:
-      "Generate images via local ComfyUI (API :8188). Pass a workflow template (path or inline JSON) + per-node patches; it submits, waits, fetches and saves PNGs. For ComfyUI-only models (e.g. DiT models like Anima) that Forge's WebUI cannot load. Typical node IDs (Anima workflow): 11/12 = CLIP text, 19 = KSampler(steps/cfg/sampler/scheduler/seed), 28 = EmptyLatentImage(width/height/batch_size), 44 = UNETLoader, 45 = CLIPLoader.",
+      "Generate images via local ComfyUI (API :8188). Pass a workflow template (path or inline JSON) + per-node patches; it submits, waits, fetches and saves PNGs. For ComfyUI-only models (e.g. DiT models like Anima) that NeoForge's WebUI cannot load. Typical node IDs (Anima workflow): 11/12 = CLIP text, 19 = KSampler(steps/cfg/sampler/scheduler/seed), 28 = EmptyLatentImage(width/height/batch_size), 44 = UNETLoader, 45 = CLIPLoader.",
     inputSchema: {
       type: "object",
       properties: {

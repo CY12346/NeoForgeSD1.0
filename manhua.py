@@ -7,7 +7,7 @@ manhua.py — 出图调度器（可复用层之三）
 
 设计原则（对应 comfy_client.py 里的承诺）：
   · 上层只认 generate(shot) -> [png bytes] 这一个接口
-  · 底层是 ComfyUI 还是 Forge 由 --backend 决定，换引擎不动业务代码
+  · 底层是 ComfyUI 还是 NeoForge 由 --backend 决定，换引擎不动业务代码
   · 每个镜头独立计时 + 记录 seed + 落盘命名 {id}.png，失败不中断整批
 
 用法：
@@ -22,7 +22,7 @@ manhua.py — 出图调度器（可复用层之三）
                 "unet":"anima-turbo-v1.1.safetensors",
                 "clip":"qwen_3_06b_base.safetensors",
                 "vae":"qwen_image_vae.safetensors"},
-      "forge": {"checkpoint": "Illustrious-XL-v0.1"}
+      "neoforge": {"checkpoint": "Illustrious-XL-v0.1"}
     },
     "defaults": {"width":768, "height":1344, "steps":8, "cfg":1.5,
                  "sampler":"er_sde", "scheduler":"simple", "seed":-1},
@@ -34,7 +34,7 @@ manhua.py — 出图调度器（可复用层之三）
 
 环境变量：
   COMFY_URL    ComfyUI 地址（默认 http://127.0.0.1:8188）
-  SD_API       Forge WebUI 地址（默认 http://127.0.0.1:7860）
+  SD_API       NeoForge WebUI 地址（默认 http://127.0.0.1:7860）
 """
 
 from __future__ import annotations
@@ -141,10 +141,10 @@ class ComfyBackend(Backend):
         return self.client.txt2img(wf)
 
 
-class ForgeBackend(Backend):
-    """Forge WebUI 后端：走 /sdapi/v1/txt2img，自动处理切模型/采样器校验。"""
+class NeoForgeBackend(Backend):
+    """NeoForge WebUI 后端：走 /sdapi/v1/txt2img，自动处理切模型/采样器校验。"""
 
-    name = "forge"
+    name = "neoforge"
 
     def __init__(self, api: str, cfg: dict):
         self.client = SD(api)
@@ -239,7 +239,7 @@ def run(shots: dict, backend: Backend, out_dir: str, limit: int = 0, dry: bool =
 def main():
     ap = argparse.ArgumentParser(description="出图调度器：镜头表 -> 批量出图")
     ap.add_argument("--shots", required=True, help="镜头表 JSON 路径")
-    ap.add_argument("--backend", choices=["comfy", "forge"], default="comfy")
+    ap.add_argument("--backend", choices=["comfy", "neoforge"], default="comfy")
     ap.add_argument("--out", default="out", help="输出目录")
     ap.add_argument("--limit", type=int, default=0, help="只跑前 N 镜（0=全部）")
     ap.add_argument("--dry-run", action="store_true", help="不落盘，只打印")
@@ -250,11 +250,11 @@ def main():
     if args.backend == "comfy":
         backend = ComfyBackend(os.environ.get("COMFY_URL", "http://127.0.0.1:8188"), bcfg)
     else:
-        backend = ForgeBackend(os.environ.get("SD_API", "http://127.0.0.1:7860"), bcfg)
+        backend = NeoForgeBackend(os.environ.get("SD_API", "http://127.0.0.1:7860"), bcfg)
 
     if not backend.alive():
         tip = ("启动 ComfyUI（双击 D:\\AIGC\\comfyui\\启动ComfyUI.cmd）" if args.backend == "comfy"
-               else "启动 Forge（sd_start 或双击启动SD-API.bat）")
+               else "启动 NeoForge WebUI（sd_start 或双击启动SD-API.bat）")
         raise SystemExit(f"{args.backend} 后端未就绪。{tip}")
 
     run(shots, backend, args.out, args.limit, args.dry_run)

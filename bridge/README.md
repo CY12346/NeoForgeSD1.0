@@ -83,7 +83,7 @@ mcp_servers:
 
 2. **注意力优化退化**（**2026-10-16 已修复**）
    没装 xformers 时 `Automatic` 会退到 **Doggettx**，AnimateDiff 实测 **143 秒/步**。
-   当时修法是加 `--opt-sdp-attention`，但 **Forge Classic 不认这个参数**，`launch.py` 会
+   当时修法是加 `--opt-sdp-attention`，但 **NeoForge（Forge Classic）不认这个参数**，`launch.py` 会
    直接报 `unrecognized arguments` 退出 —— `sd_start` 因此一直起不来。
    现已装好 `xformers 0.0.25.post1+cu118`（启动日志自证），自动生效，故该参数已删除。
    → `sd_start` 固定 `--api --skip-install`。

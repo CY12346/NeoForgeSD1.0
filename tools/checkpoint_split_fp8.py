@@ -23,8 +23,8 @@ SDXL checkpoint 张量前缀（实测依据）：
   conditioner.embedders.1. = ViT-bigG（clip_name2）
   first_stage_model.       = VAE
 
-CLIP 拆分的键名口径（照抄 ComfyUI supported_models.SDXL.process_clip_state_dict
-与 load_text_encoder_state_dicts 的实际消费方式，2026-10-17 实测踩坑修正）：
+CLIP 拆分的键名口径（依据 SDXL checkpoint 实存张量结构推导，本机 2026-10-17
+实测验证通过）：
   · clip_l 文件键 = 剥掉 "conditioner.embedders.0.transformer."，留下 "text_model.encoder..."
     （残留在 "transformer." 前缀会全部加载失败 → meta tensor 崩溃）
   · clip_g 文件键 = 剥掉 "conditioner.embedders.1.model."，留下 OpenCLIP 原格式

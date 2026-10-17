@@ -5,7 +5,7 @@
   T1 openpose   ：有单元 vs 无单元，同 seed 同 prompt → 图不同 = 生效
   T2 IP-Adapter ：有单元 vs 无单元，同 seed 同 prompt → 图不同 = 生效
 判定量：像素差（PIL ImageChops 的 rms）+ 日志痕迹。
-两种 alwayson 键名都试（"controlnet" / "ControlNet"），因为 Forge 与扩展各有叫法。
+两种 alwayson 键名都试（"controlnet" / "ControlNet"），因为 NeoForge 与扩展各有叫法。
 """
 import base64
 import json
@@ -66,7 +66,7 @@ def main():
         print("!! SD 未就绪")
         return 1
     sd.set_checkpoint(sd.pick_checkpoint(CKPT))
-    ref = dataurl(REF)   # 裸 base64 字符串 —— Forge 的 ControlNetUnit.from_dict 要的就是这个
+    ref = dataurl(REF)   # 裸 base64 字符串 —— NeoForge 的 ControlNetUnit.from_dict 要的就是这个
 
     print("[基线] 无单元 ...")
     base = gen(sd, None, None, "T0_无单元")
