@@ -90,7 +90,7 @@ node server.mjs   # 走 stdio JSON-RPC，由 MCP 客户端拉起
 
 ### 3. 4GB 显存跑 SDXL：fp8 拆分（降显存）
 
-SDXL 全家桶 checkpoint（~6.9G）直接加载，权重显存是大头。拆成 UNet(fp8) + 双 CLIP + VAE 后，UNet 权重显存砍半（~2.5G → ~1.25G），把空间让给竖屏激活值：
+SDXL 全家桶 checkpoint（~6.9G）直接加载，权重显存是大头。拆成 UNet(fp8) + 双 CLIP + VAE 后，UNet 权重显存砍半（fp16 5.1G → fp8 2.6G），把空间让给竖屏激活值：
 
 ```bash
 # 用 ComfyUI 自带的 venv（有 torch2.8 + safetensors）

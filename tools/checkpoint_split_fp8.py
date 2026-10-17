@@ -22,6 +22,14 @@ SDXL checkpoint 张量前缀（实测依据）：
   conditioner.embedders.0. = CLIP-L（DualCLIPLoader 的 clip_name1）
   conditioner.embedders.1. = ViT-bigG（clip_name2）
   first_stage_model.       = VAE
+
+CLIP 拆分的键名口径（照抄 ComfyUI supported_models.SDXL.process_clip_state_dict
+与 load_text_encoder_state_dicts 的实际消费方式，2026-10-17 实测踩坑修正）：
+  · clip_l 文件键 = 剥掉 "conditioner.embedders.0.transformer."，留下 "text_model.encoder..."
+    （残留在 "transformer." 前缀会全部加载失败 → meta tensor 崩溃）
+  · clip_g 文件键 = 剥掉 "conditioner.embedders.1.model."，留下 OpenCLIP 原格式
+    （"transformer.resblocks..."、"positional_embedding" 等），ComfyUI 加载时会
+    自动 clip_text_transformers_convert 成 "text_model.*"。
 """
 import os
 import sys
@@ -32,6 +40,9 @@ from safetensors import safe_open
 from safetensors.torch import save_file
 
 FP8 = torch.float8_e4m3fn
+
+CLIP_L_PREFIX = "conditioner.embedders.0.transformer."
+CLIP_G_PREFIX = "conditioner.embedders.1.model."
 
 
 def split(ckpt_path: str, root: str):
@@ -49,10 +60,10 @@ def split(ckpt_path: str, root: str):
         for k in f.keys():
             if k.startswith("model.diffusion_model."):
                 parts["unet"][k[len("model.diffusion_model."):]] = f.get_tensor(k)
-            elif k.startswith("conditioner.embedders.0."):
-                parts["clip_l"][k[len("conditioner.embedders.0."):]] = f.get_tensor(k)
-            elif k.startswith("conditioner.embedders.1."):
-                parts["clip_g"][k[len("conditioner.embedders.1."):]] = f.get_tensor(k)
+            elif k.startswith(CLIP_L_PREFIX):
+                parts["clip_l"][k[len(CLIP_L_PREFIX):]] = f.get_tensor(k)
+            elif k.startswith(CLIP_G_PREFIX):
+                parts["clip_g"][k[len(CLIP_G_PREFIX):]] = f.get_tensor(k)
             elif k.startswith("first_stage_model."):
                 parts["vae"][k[len("first_stage_model."):]] = f.get_tensor(k)
     print(f"  读入完成 {time.time()-t0:.0f}s：unet {len(parts['unet'])} 键 / "
