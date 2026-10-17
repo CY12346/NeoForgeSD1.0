@@ -1,0 +1,14 @@
+{
+  "name": "aigc-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Local MCP server bridging this machine's AIGC software (Stable Diffusion WebUI, ffmpeg, Blender, edge-tts / GPT-SoVITS, Pillow) into Hermes tools.",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.0"
+  }
+}

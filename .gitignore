@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+node_modules/
+spike/spike-out/
+*.log
+out/
+outputs/
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+.DS_Store
+NVIDIA Corporation/
