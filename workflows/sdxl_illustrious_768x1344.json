@@ -1,5 +1,5 @@
 {
-  "44": {"inputs": {"unet_name": "Illustrious-XL-v2.0-fp8.safetensors", "weight_dtype": "fp8_e4m3fn"}, "class_type": "UNETLoader", "_meta": {"title": "Load Diffusion Model"}},
+  "44": {"inputs": {"unet_name": "Illustrious-XL-v2.0-fp16.safetensors", "weight_dtype": "default"}, "class_type": "UNETLoader", "_meta": {"title": "Load Diffusion Model"}},
   "45": {"inputs": {"clip_name1": "Illustrious-XL-v2.0_clip_l.safetensors", "clip_name2": "Illustrious-XL-v2.0_clip_g.safetensors", "type": "sdxl"}, "class_type": "DualCLIPLoader", "_meta": {"title": "DualCLIPLoader"}},
   "15": {"inputs": {"vae_name": "Illustrious-XL-v2.0_vae.safetensors"}, "class_type": "VAELoader", "_meta": {"title": "Load VAE"}},
   "11": {"inputs": {"text": "masterpiece, best quality, absurdres. PLACEHOLDER", "clip": ["45", 0]}, "class_type": "CLIPTextEncode", "_meta": {"title": "CLIP Text Encode (Positive)"}},

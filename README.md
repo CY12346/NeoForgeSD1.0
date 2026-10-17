@@ -90,14 +90,16 @@ node server.mjs   # 走 stdio JSON-RPC，由 MCP 客户端拉起
 
 ### 3. 4GB 显存跑 SDXL：fp8 拆分（降显存）
 
-SDXL 全家桶 checkpoint（~6.9G）直接加载，权重显存是大头。拆成 UNet(fp8) + 双 CLIP + VAE 后，UNet 权重显存砍半（fp16 5.1G → fp8 2.6G），把空间让给竖屏激活值：
+SDXL 全家桶 checkpoint（~6.9G）直接加载，权重显存是大头。拆成 UNet + 双 CLIP + VAE 后按需选择精度：
 
 ```bash
 # 用 ComfyUI 自带的 venv（有 torch2.8 + safetensors）
 D:\AIGC\comfyui\venv\Scripts\python.exe tools/checkpoint_split_fp8.py <checkpoint.safetensors> <comfyui根目录>
 ```
 
-产出 `diffusion_models/<stem>-fp8.safetensors`（出图用）+ `-fp16`（对比基准）+ `text_encoders/*_clip_l/_clip_g` + `vae/*_vae`，配合 `workflows/sdxl_illustrious_768x1344.json`（`UNETLoader weight_dtype=fp8_e4m3fn` + `DualCLIPLoader type=sdxl`）直接用。
+产出 `diffusion_models/<stem>-fp16.safetensors`（默认用这个）+ `-fp8`（兜底）+ `text_encoders/*_clip_l/_clip_g` + `vae/*_vae`。
+
+> **实测结论（4GB 卡，DynamicVRAM 开启，768x1344/25步）**：fp8 峰值显存只省 0.14G（3.45 vs 3.59G）、速度持平，但同 seed 像素差 rms≈27.6（PSNR 19.3dB）、平坦区噪点 1.62 倍 → **默认选 fp16 + DynamicVRAM**（本机可稳定跑，峰值 ~3.5G 不爆）；fp8 仅当关 DynamicVRAM 或显存被 LoRA 挤占时兜底。
 
 ---
 
