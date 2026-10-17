@@ -74,7 +74,20 @@ def split(ckpt_path: str, root: str):
 
     def save(d, path, dtype):
         t0 = time.time()
-        save_file({k: cast(v, dtype) for k, v in d.items()}, path)
+        tmp = path + ".tmp"
+        try:
+            save_file({k: cast(v, dtype) for k, v in d.items()}, tmp)
+            os.replace(tmp, path)
+        except OSError as e:
+            if os.path.exists(tmp):
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+            print(f"  ⚠ {os.path.basename(path)} 写入被拒（{e}）——"
+                  f"若 ComfyUI 正在运行且已加载该模型，文件会被锁；"
+                  f"重启 ComfyUI 后重跑本脚本即可", flush=True)
+            return
         print(f"  ✓ {os.path.basename(path)}  {os.path.getsize(path)/1e6:.0f}MB  {time.time()-t0:.0f}s", flush=True)
 
     if not parts["unet"]:
