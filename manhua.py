@@ -82,6 +82,9 @@ class ComfyBackend(Backend):
         self.nodes = {**DEFAULT_NODES, **(cfg.get("nodes") or {})}
         self.unet = cfg.get("unet")
         self.clip = cfg.get("clip")
+        # SDXL 双 CLIP（DualCLIPLoader：clip_name1=CLIP-L, clip_name2=ViT-bigG）
+        self.clip_l = cfg.get("clip_l")
+        self.clip_g = cfg.get("clip_g")
         self.vae = cfg.get("vae")
 
     @staticmethod
@@ -103,8 +106,16 @@ class ComfyBackend(Backend):
         p = self.nodes
         if self.unet and p["unet"] in wf:
             wf[p["unet"]]["inputs"]["unet_name"] = self.unet
-        if self.clip and p["clip"] in wf:
-            wf[p["clip"]]["inputs"]["clip_name"] = self.clip
+        # 单 CLIP（DiT 类，如 Anima）与双 CLIP（SDXL 类）都支持
+        clip_node = wf.get(p["clip"]) or {}
+        clip_inputs = clip_node.get("inputs") or {}
+        if "clip_name" in clip_inputs and self.clip:
+            clip_inputs["clip_name"] = self.clip
+        elif "clip_name1" in clip_inputs:
+            if self.clip_l:
+                clip_inputs["clip_name1"] = self.clip_l
+            if self.clip_g:
+                clip_inputs["clip_name2"] = self.clip_g
         if self.vae and p["vae"] in wf:
             wf[p["vae"]]["inputs"]["vae_name"] = self.vae
         if p["positive"] in wf:

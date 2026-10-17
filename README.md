@@ -88,6 +88,17 @@ node server.mjs   # 走 stdio JSON-RPC，由 MCP 客户端拉起
 | ComfyUI 0.41.0 | `:8188` | DiT 模型（Anima 等 Forge 加载不了的） | 需 torch ≥ 2.8 才开 DynamicVRAM |
 | Forge WebUI | `:7860` | SD1.5 / SDXL / Illustrious | 采样器名**不带** `Karras` 后缀，调度器单独传 |
 
+### 3. 4GB 显存跑 SDXL：fp8 拆分（降显存）
+
+SDXL 全家桶 checkpoint（~6.9G）直接加载，权重显存是大头。拆成 UNet(fp8) + 双 CLIP + VAE 后，UNet 权重显存砍半（~2.5G → ~1.25G），把空间让给竖屏激活值：
+
+```bash
+# 用 ComfyUI 自带的 venv（有 torch2.8 + safetensors）
+D:\AIGC\comfyui\venv\Scripts\python.exe tools/checkpoint_split_fp8.py <checkpoint.safetensors> <comfyui根目录>
+```
+
+产出 `diffusion_models/<stem>-fp8.safetensors`（出图用）+ `-fp16`（对比基准）+ `text_encoders/*_clip_l/_clip_g` + `vae/*_vae`，配合 `workflows/sdxl_illustrious_768x1344.json`（`UNETLoader weight_dtype=fp8_e4m3fn` + `DualCLIPLoader type=sdxl`）直接用。
+
 ---
 
 ## ⚠️ 模型许可（务必自审）
@@ -112,7 +123,8 @@ node server.mjs   # 走 stdio JSON-RPC，由 MCP 客户端拉起
 manhua.py            # 出图调度器（入口）
 core/                # 双后端 HTTP 客户端
 bridge/              # MCP 桥（node，含 py/ 辅助脚本）
-tools/               # 模型下载 / ComfyUI 自检等小工具
+tools/               # 模型下载 / checkpoint 拆分(fp8) / ComfyUI 自检等小工具
+workflows/           # 现成工作流模板（SDXL 竖屏 fp8 等）
 spike/               # 实测/基准脚本（选型依据留痕）
 ```
 
