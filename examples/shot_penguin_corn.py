@@ -55,7 +55,7 @@ def split_sheet(path):
     return views
 
 
-def clean_sprite(im, strict=242, sat_tol=10, bottom_lo=205):
+def clean_sprite(im, strict=242, sat_tol=10, bottom_lo=205, with_bbox=False):
     a = np.asarray(im.convert("RGB")).astype(np.int16)
     mn = a.min(axis=2)
     sat = a.max(axis=2) - mn
@@ -92,7 +92,10 @@ def clean_sprite(im, strict=242, sat_tol=10, bottom_lo=205):
     al = Image.fromarray(alpha).filter(ImageFilter.MinFilter(3)).filter(ImageFilter.GaussianBlur(0.7))
     out = im.convert("RGBA")
     out.putalpha(al)
-    return out.crop(out.getbbox() or (0, 0, out.width, out.height))
+    bbox = out.getbbox() or (0, 0, out.width, out.height)
+    if with_bbox:
+        return out.crop(bbox), bbox
+    return out.crop(bbox)
 
 
 def make_straw_hat(width=430):
