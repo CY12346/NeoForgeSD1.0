@@ -37,6 +37,17 @@ ACTIONS = {
     "bow": "鞠躬：上身整体前倾再回正",
 }
 
+# 外部注册的动作曲线：name -> fn(name, t, dur, P) -> 形变参数。core.traj 用它接轨迹驱动，
+# 不需要 monkeypatch action_params，内置 8 个模板也不受影响。
+PARAM_FNS = {}
+
+
+def register_action(name, fn, desc=""):
+    """注册一条自定义动作曲线（同名覆盖），返回 name 方便链式调用。"""
+    PARAM_FNS[name] = fn
+    ACTIONS[name] = desc or name
+    return name
+
 
 # ------------------------------------------------------------------ 抠图
 MATTE_PY = os.environ.get("MATTE_PY", r"D:\aicg\matting\venv\Scripts\python.exe")
@@ -149,6 +160,8 @@ def _sin(t, T, ph=0.0):
 # ------------------------------------------------------------------ 动作曲线
 def action_params(name, t, dur, P):
     """返回该时刻的形变参数（单位：以角色高度 H 为 1 的归一化比例）"""
+    if name in PARAM_FNS:                 # 外部注册的动作曲线（如 core.traj）
+        return PARAM_FNS[name](name, t, dur, P)
     p = min(max(t / dur, 0.0), 1.0)
     arm_l = arm_r = 0.0      # 负=上抬
     tilt = 0.0

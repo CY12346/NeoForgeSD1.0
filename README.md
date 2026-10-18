@@ -107,6 +107,26 @@ python -m core.motion --sprite hero.png --action wave \
 
 本机 8 个动作模板实测全部 `COHERENT`（diff_subject 2.1–3.3、cv ≤0.41、0 重复帧、闪烁 ≤1.3%）；无背景纯色画布同样判 COHERENT（整帧口径会误判 —— 同一支 nod：diff_mean 0.27 / diff_subject 2.11）。重复帧按 5% 容忍（动作收尾的定格帧不算冻结），超过才判 freeze；纯静态片仍是 `NEEDS_WORK`。
 
+### 轨迹驱动（`core/traj.py`）
+
+8 个模板是固定动作；要让木偶照着某支现成片子打拳/挥手，就用轨迹驱动——先从片子里把运动抽成**事件**，再用事件驱动形变（不是逐帧抠动作，所以不会漂移）。
+
+```bash
+# ① 抽轨迹：视频给路径，也可以直接给一帧目录（png 序列）
+python -m core.traj extract D:/ref/punch.gif --out traj.json --fps 10 --mode skin
+#   motion（默认）：帧差前景，任何主体都能用（走/跳/挥）
+#   skin          ：肤色 prior + 静态肤色剔除，专治「手和脸肤色一样、帧差糊成一团」
+
+# ② 出片：事件 → 冲量曲线（0.05s 起手 / 0.15s 指数衰减）驱动抬臂·倾斜·挤压·前倾，
+#    再叠冲击线与递减抖动；出片自动跑连贯性体检
+python -m core.traj apply --sprite hero.png --traj traj.json --out out/punch.mp4 \
+    --loops 2 --bg assets/bg_cornfield.png --sheet out/sheet.png
+```
+
+`traj.json` 里存 `summary`（帧数/尺寸/fps/检测率/左右计数）+ 每帧质心·面积·主轴角·速度 + `events`（面积局部峰，带 `strength`）。
+
+实测（`_traj_test/fish` 51 帧 320×426 @10fps → 企鹅立绘）：检测率 98%、12 个事件、左右 26/24；`--loops 2` 出 10.92s / 262 帧 / 720²@24fps，`diff_subject 9.03 · cv 0.58 · 0 重复帧 · COHERENT`（旧一次性脚本是 263 帧 / 10.96s / 10.17，同量级）。回归：`python tests/traj_check.py`。
+
 ### 图形入口（双击即用）
 
 ```
@@ -178,8 +198,9 @@ D:\AIGC\comfyui\venv\Scripts\python.exe tools/checkpoint_split_fp8.py <checkpoin
 
 ```
 manhua.py            # 出图调度器（入口）
-core/                # 双后端 HTTP 客户端
+core/                # 双后端 HTTP 客户端 + 动作引擎(motion) + 连贯性体检(quality) + 轨迹驱动(traj)
 bridge/              # MCP 桥（node，含 py/ 辅助脚本）
+tests/               # 自检：smoke.py（链路冒烟）、traj_check.py（轨迹驱动回归）
 tools/               # 模型下载 / checkpoint 拆分(fp8) / ComfyUI 自检等小工具
 workflows/           # 现成工作流模板（SDXL 竖屏 fp8 等）
 spike/               # 实测/基准脚本（选型依据留痕）
