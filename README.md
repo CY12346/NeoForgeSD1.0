@@ -81,6 +81,53 @@ node server.mjs   # 走 stdio JSON-RPC，由 MCP 客户端拉起
 
 ---
 
+## 动作（视频）与图形入口
+
+出图之后最常问的是「让人物动起来」。本机实测给出两条引擎，别混用：
+
+| 引擎 | 显存 | 3 秒成片耗时 | 能做什么 | 不能做什么 |
+|---|---|---|---|---|
+| **puppet**（立绘形变场） | 0（纯 CPU） | 10–16 s @720×720/24fps | 招手 / 举双手 / 点头 / 跳跃 / 伸手 / 出拳 / 鞠躬 / 待机，动作由曲线决定，**不漂移、不糊尾帧** | 需要单张正面立绘；大幅肢体会有一点「木偶感」 |
+| **animatediff**（SD 图生视频） | ≈3.9 G（4G 卡满负荷） | 457 s @512×512/24 帧 | 呼吸、衣角、发丝、背景微动，氛围感 | 剧本级动作（抬手/挥拳）几乎不动；denoise ≥0.6 掉身份，后段还会糊 |
+
+### 命令行
+
+```bash
+python -m core.motion --action list                      # 全部动作模板
+python -m core.motion --sprite hero.png --action wave \
+    --dur 3 --fps 24 --size 720x720 --bg assets/bg_cornfield.png \
+    --out out/wave.mp4 --metrics                          # 出片并做连贯性体检
+```
+
+### 连贯性体检（`core/quality.py`）
+
+一条视频算三组指标，给出 `COHERENT / NEEDS_WORK`：
+运动量 `diff_mean`、流畅度 `diff_cv` + `max_jerk`（跳变尖峰）、稳定度 `duplicate_frames` / `color_drift_end` / `flicker_pct`。
+命令行：`python core/quality.py out/wave.mp4`。
+
+本机 8 个动作模板实测全部 `COHERENT`（diff 1.83–3.00、cv ≤0.41、0 重复帧、闪烁 ≤1.3%）。
+
+### 图形入口（双击即用）
+
+```
+启动NeoForgeSD.cmd   →  自动拉起 SD1.5 后端 + 控制台，并打开 http://127.0.0.1:8899
+停止NeoForgeSD.cmd   →  只结束本项目的进程
+```
+
+页面四块：① 出图（txt2img）② 动作·SD 图生视频（AnimateDiff）③ 木偶动作（puppet，含连贯性自检）④ 结果播放/下载。
+
+接口（也方便脚本调）：
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/status` | 后端在线、底模、AnimateDiff、动作模板 |
+| POST | `/api/image` | 出图，返回 `job_id` |
+| POST | `/api/motion` | AnimateDiff 图生视频 |
+| POST | `/api/puppet` | 木偶动作（`action` / `dur` / `fps` / `size` / `bg`），完成后带 `coherence` |
+| GET | `/api/job/<id>` | 轮询进度与产物（`media_url`） |
+
+---
+
 ## 兼容后端
 
 | 后端 | 地址 | 适用模型 | 备注 |
