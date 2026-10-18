@@ -594,7 +594,7 @@ async function pollPuppet(jid){
       if(q.verdict){
         const ok=q.verdict==='COHERENT';
         $('q3').innerHTML='连贯性自检：<b style="color:'+(ok?'#4ade80':'#fbbf24')+'">'+q.verdict+'</b>'+
-          ' · 帧数 '+q.frames+' · 运动量 '+(q.diff_mean??'-')+' · 抖动 '+(q.diff_cv??'-')+
+          ' · 帧数 '+q.frames+' · 运动量 '+(q.diff_subject??q.diff_mean??'-')+' · 抖动 '+(q.diff_cv??'-')+
           ' · 跳变 '+((q.duplicate_frames||[]).length)+' · 漂移 '+(q.color_drift_end??'-')+
           (ok?'':' · 未过项：'+(q.failed_on||[]).join(','));
       }

@@ -39,8 +39,57 @@ ACTIONS = {
 
 
 # ------------------------------------------------------------------ 抠图
+MATTE_PY = os.environ.get("MATTE_PY", r"D:\aicg\matting\venv\Scripts\python.exe")
+MATTE_SCRIPT = os.environ.get("MATTE_SCRIPT", r"D:\aicg\matting\cutout.py")
+_MATTE_WARNED = False
+
+
+def _matte_alpha(im):
+    """BiRefNet 语义抠图（D:\\aicg\\matting\\cutout.py，MIT）。成功返回紧凑 RGBA，失败/不可用返回 None。"""
+    global _MATTE_WARNED
+    if os.environ.get("NEOFORGE_MATTE", "1") == "0":
+        return None
+    if not (os.path.exists(MATTE_PY) and os.path.exists(MATTE_SCRIPT)):
+        return None
+    try:
+        with tempfile.TemporaryDirectory() as td:
+            src = os.path.join(td, "in.png")
+            dst = os.path.join(td, "out.png")
+            (im if isinstance(im, Image.Image) else Image.open(im)).convert("RGB").save(src)
+            r = subprocess.run(
+                [MATTE_PY, MATTE_SCRIPT, "matte", src, dst,
+                 "--model", os.environ.get("MATTE_MODEL", "isnet"), "--edge-decontam"],
+                capture_output=True, timeout=300)
+            if r.returncode != 0 or not os.path.exists(dst):
+                if not _MATTE_WARNED:
+                    _MATTE_WARNED = True
+                    print("[motion] matte failed, fallback to white-key:", (r.stderr or b"")[-300:])
+                return None
+            out = Image.open(dst).convert("RGBA")
+            box = out.split()[3].point(lambda v: 255 if v > 8 else 0).getbbox()
+            return out.crop(box) if box else out
+    except Exception as e:  # 引擎缺失/超时都不该让主流程挂
+        if not _MATTE_WARNED:
+            _MATTE_WARNED = True
+            print("[motion] matte unavailable, fallback to white-key:", e)
+        return None
+
+
 def cutout_white(path, thresh=26):
-    """白/近白底立绘 → 透明底。从四角 floodfill 去底，再收边去白边。接受路径或 PIL.Image。"""
+    """立绘 → 透明底（紧凑裁切）。
+
+    先走 BiRefNet 语义抠图：白底/彩底/复杂底都能扣，边缘是软 alpha、无白边。
+    引擎不可用时回退到原来的白底 floodfill（只对近白底有效）。
+    """
+    src = Image.open(path) if isinstance(path, (str, bytes)) else path
+    matted = _matte_alpha(src)
+    if matted is not None:
+        return matted
+    return cutout_white_key(src, thresh)
+
+
+def cutout_white_key(path, thresh=26):
+    """旧做法：白/近白底 floodfill 去底 + MinFilter 收边（仅白底可用，会留白边）。"""
     im = (Image.open(path) if isinstance(path, (str, bytes)) else path).convert("RGB")
     key = (255, 0, 255)
     for xy in [(0, 0), (im.width - 1, 0), (0, im.height - 1), (im.width - 1, im.height - 1)]:

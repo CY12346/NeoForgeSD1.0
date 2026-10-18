@@ -102,10 +102,10 @@ python -m core.motion --sprite hero.png --action wave \
 ### 连贯性体检（`core/quality.py`）
 
 一条视频算三组指标，给出 `COHERENT / NEEDS_WORK`：
-运动量 `diff_mean`、流畅度 `diff_cv` + `max_jerk`（跳变尖峰）、稳定度 `duplicate_frames` / `color_drift_end` / `flicker_pct`。
+运动量 `diff_subject`（只在「整段里变过的像素」上算差分，不受无背景/主体占比小的稀释；同时保留整帧 `diff_mean` 作对照）、流畅度 `diff_cv` + `max_jerk`（跳变尖峰）、稳定度 `duplicate_frames` / `color_drift_end` / `flicker_pct`。
 命令行：`python core/quality.py out/wave.mp4`。
 
-本机 8 个动作模板实测全部 `COHERENT`（diff 1.83–3.00、cv ≤0.41、0 重复帧、闪烁 ≤1.3%）。
+本机 8 个动作模板实测全部 `COHERENT`（diff_subject 2.1–3.3、cv ≤0.41、0 重复帧、闪烁 ≤1.3%）；无背景纯色画布同样判 COHERENT（整帧口径会误判 —— 同一支 nod：diff_mean 0.27 / diff_subject 2.11）。重复帧按 5% 容忍（动作收尾的定格帧不算冻结），超过才判 freeze；纯静态片仍是 `NEEDS_WORK`。
 
 ### 图形入口（双击即用）
 
@@ -125,6 +125,14 @@ python -m core.motion --sprite hero.png --action wave \
 | POST | `/api/motion` | AnimateDiff 图生视频 |
 | POST | `/api/puppet` | 木偶动作（`action` / `dur` / `fps` / `size` / `bg`），完成后带 `coherence` |
 | GET | `/api/job/<id>` | 轮询进度与产物（`media_url`） |
+
+### 自检（`tests/smoke.py`）
+
+```bash
+python tests/smoke.py     # 全仓 py 编译 + node --check bridge + 起控制台走完整 HTTP 链路
+```
+
+不需要 SD 后端、不需要显卡：`/api/status` → 首页 HTML → `POST /api/puppet` 出片 → 轮询 → 下载 mp4 验 `ftyp` → 未知 job 要 404 → 无后端时 `/api/motion` 要 503。约 13 秒跑完，结果写 `smoke.json`（`NEOFORGE_TEST_OUT` 可指定目录）。
 
 ---
 

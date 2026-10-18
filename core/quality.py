@@ -85,6 +85,20 @@ def coherence(path, frames=None, sheet=None):
     pos = d[d > 0.5]
     cv = float(pos.std() / pos.mean()) if len(pos) and pos.mean() > 0 else 0.0
 
+    # 主体区域运动量：只在「整段里发生过变化的像素」上算差分。
+    # 整帧均值会被大片静止区稀释 —— 无背景（纯色画布）或主体占画面小时，
+    # 真实动作会被判成静止（实测：木偶 nod 无背景 diff_mean 0.27 / 有背景 1.86，
+    # 而主体区域口径两者都是 2.1）。
+    act = np.zeros(frames[0].shape[:2], dtype=bool)
+    for im in frames:
+        act |= np.abs(im - frames[0]).mean(axis=2) > 6
+    active_frac = float(act.mean())
+    if active_frac >= 0.002:
+        diff_subject = float(np.mean([float(np.abs(frames[i] - frames[i - 1]).mean(axis=2)[act].mean())
+                                      for i in range(1, n)]))
+    else:
+        diff_subject = 0.0
+
     drift = np.array([float(np.abs(im - frames[0]).mean()) for im in frames])
     lum = np.array([float(im.mean()) for im in frames])
     flicker = float(lum.std() / lum.mean() * 100) if lum.mean() else 0.0
@@ -103,6 +117,7 @@ def coherence(path, frames=None, sheet=None):
         cx.append(float((xs * w[ys, xs]).sum() / tot))
         cy.append(float((ys * w[ys, xs]).sum() / tot))
     travel = float(np.hypot(np.diff(cx), np.diff(cy)).sum()) if n > 1 else 0.0
+    allow_dupe = max(1, int(round(0.05 * n)))  # 收尾定格的 1-3 帧不算冻结，>5% 才算
 
     res = {
         "video": path,
@@ -111,16 +126,19 @@ def coherence(path, frames=None, sheet=None):
         "fps": info.get("fps"),
         "dur_s": round(n / info["fps"], 2) if info.get("fps") else None,
         "diff_mean": round(float(d.mean()), 2),
+        "diff_subject": round(diff_subject, 2),
+        "active_frac": round(active_frac, 4),
         "diff_cv": round(cv, 3),
         "max_jerk": round(float(jerk.max()), 2) if len(jerk) else 0.0,
         "duplicate_frames": dupe,
+        "duplicate_allow": allow_dupe,
         "color_drift_end": round(float(drift[-1]), 2),
         "flicker_pct": round(flicker, 2),
         "subject_travel_px": round(travel, 1),
     }
-    ok_motion = res["diff_mean"] >= 1.0 and res["subject_travel_px"] >= 8
+    ok_motion = res["diff_subject"] >= 1.0 and res["subject_travel_px"] >= 8
     ok_smooth = res["diff_cv"] <= 0.85 and res["max_jerk"] <= 12.0
-    ok_stable = len(dupe) == 0 and res["color_drift_end"] <= 45 and res["flicker_pct"] <= 6
+    ok_stable = len(dupe) <= allow_dupe and res["color_drift_end"] <= 45 and res["flicker_pct"] <= 6
     res["failed_on"] = [k for k, v in (("motion", ok_motion), ("smooth", ok_smooth),
                                        ("stable", ok_stable)) if not v]
     res["verdict"] = "COHERENT" if not res["failed_on"] else "NEEDS_WORK"
