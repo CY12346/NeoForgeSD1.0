@@ -1,3 +1,5 @@
+注意：本项目是作者用于学习vibe coding的产物，作者本人不会任何编程
+
 # NeoForgeSD 1.0
 
 本地 Stable Diffusion **出图编排层**：双后端客户端 + 批量出图调度器 + MCP 桥。
