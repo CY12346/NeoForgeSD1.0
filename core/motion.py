@@ -40,8 +40,8 @@ ACTIONS = {
 
 # ------------------------------------------------------------------ 抠图
 def cutout_white(path, thresh=26):
-    """白/近白底立绘 → 透明底。从四角 floodfill 去底，再收边去白边。"""
-    im = Image.open(path).convert("RGB")
+    """白/近白底立绘 → 透明底。从四角 floodfill 去底，再收边去白边。接受路径或 PIL.Image。"""
+    im = (Image.open(path) if isinstance(path, (str, bytes)) else path).convert("RGB")
     key = (255, 0, 255)
     for xy in [(0, 0), (im.width - 1, 0), (0, im.height - 1), (im.width - 1, im.height - 1)]:
         try:
