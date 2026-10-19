@@ -14,3 +14,8 @@ outputs/
 NVIDIA Corporation/
 _smoke/
 _smoke
+
+# PyInstaller 中间产物
+build/
+__pycache__/
+*.pyc
