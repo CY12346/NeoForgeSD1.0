@@ -1,9 +1,11 @@
 注意：本项目是作者用于学习vibe coding的产物，作者本人的编程技术完全无法做到当前效果。
 
-# NeoForgeSD 1.0
+# NeoForgeSD 1.0.1
 
 本地 Stable Diffusion **出图编排层**：双后端客户端 + 批量出图调度器 + MCP 桥。
 
+> **v1.0.1（2026-10-19）**：图形页面 `ui/image_app.py`（:8899）是主入口；新增**提示词助手** —— 中⇄英提示词转换（本地 8.6 万条 danbooru 中文词典，只有整句才联网兜底）、输入即补全、3958 条中文词组库、SD 风格预设一键套用。
+>
 > 这不是 Forge 或 ComfyUI 的分支。NeoForgeSD 是一层**独立于引擎之上**的编排代码，通过 HTTP API 驱动你已经装好的 NeoForge WebUI（Forge Classic 兼容）/ ComfyUI，把「镜头表」变成「一批落盘的图」。它**不含任何模型权重**，模型由你自己下载并遵守其各自许可。
 
 ---
@@ -22,6 +24,8 @@ python manhua.py --shots shots.json --backend comfy --out out_dir --limit 10
 |---|---|---|
 | 双后端客户端 | `core/comfy_client.py` `core/sdclient.py` | 封装 ComfyUI(`:8188`) 与 NeoForge WebUI(`:7860`) 的 HTTP API，把实测踩过的坑固化进去 |
 | 出图调度器 | `manhua.py` | 镜头表 → 批量出图 → 命名落盘 + manifest.json |
+| 图形页面 | `ui/image_app.py` `ui/image_page.html` | ①创作 ②后期 ③模型 ④资产 四组；提示词助手（中⇄英 / 词库 / 补全 / 风格）；自动以 `--nowebui` 拉起 SD 后端 |
+| 提示词助手 | `core/i18n_tags.py` | 读本机 SD 扩展的 danbooru 中英词典 + 词组库；纯标准库，无 GPU 无网络也能跑 |
 | MCP 桥 | `bridge/` | 把本机 AIGC 能力（SD 出图 / ComfyUI / ffmpeg / Blender / 语音）暴露成 MCP 工具给 AI Agent |
 
 ---
@@ -79,74 +83,68 @@ cd bridge && npm install
 node server.mjs   # 走 stdio JSON-RPC，由 MCP 客户端拉起
 ```
 
-工具一览：`image_generate` / `image_edit` / `image_upscale` / `comfy_generate` / `video_generate` / `video_ffmpeg` / `tts_speak` / `voice_clone` / `blender_run` 等。
+工具一览：`image_generate` / `image_edit` / `image_upscale` / `image_process` / `comfy_generate` / `sd_models` / `sd_set_model` / `sd_start` / `aigc_status` / `tts_speak` / `voice_clone` / `gsv_start`（共 12 个）。
+视频/Blender 四个工具（`video_generate` / `video_probe` / `video_ffmpeg` / `blender_run`）已按主线要求**删除**（TOOLS 条目 + handler），工具面从 16 降到 12。
+
+**分线开关**（出图主线 / 视频支线）：`NEOFORGE_BRIDGE_LINE=image|video|all`，默认 `all`（向后兼容）。
+`image` 只暴露 9 个图像工具、`video` 只剩 4 个语音工具；调到线外工具会返回明确报错而不是静默失败。实测：image=9、video=4、all=12。
 
 ---
 
-## 动作（视频）与图形入口
+## 图形入口（双击即用）
 
-出图之后最常问的是「让人物动起来」。本机实测给出两条引擎，别混用：
-
-| 引擎 | 显存 | 3 秒成片耗时 | 能做什么 | 不能做什么 |
-|---|---|---|---|---|
-| **puppet**（立绘形变场） | 0（纯 CPU） | 10–16 s @720×720/24fps | 招手 / 举双手 / 点头 / 跳跃 / 伸手 / 出拳 / 鞠躬 / 待机，动作由曲线决定，**不漂移、不糊尾帧** | 需要单张正面立绘；大幅肢体会有一点「木偶感」 |
-| **animatediff**（SD 图生视频） | ≈3.9 G（4G 卡满负荷） | 457 s @512×512/24 帧 | 呼吸、衣角、发丝、背景微动，氛围感 | 剧本级动作（抬手/挥拳）几乎不动；denoise ≥0.6 掉身份，后段还会糊 |
-
-### 命令行
-
-```bash
-python -m core.motion --action list                      # 全部动作模板
-python -m core.motion --sprite hero.png --action wave \
-    --dur 3 --fps 24 --size 720x720 --bg assets/bg_cornfield.png \
-    --out out/wave.mp4 --metrics                          # 出片并做连贯性体检
-```
-
-### 连贯性体检（`core/quality.py`）
-
-一条视频算三组指标，给出 `COHERENT / NEEDS_WORK`：
-运动量 `diff_subject`（只在「整段里变过的像素」上算差分，不受无背景/主体占比小的稀释；同时保留整帧 `diff_mean` 作对照）、流畅度 `diff_cv` + `max_jerk`（跳变尖峰）、稳定度 `duplicate_frames` / `color_drift_end` / `flicker_pct`。
-命令行：`python core/quality.py out/wave.mp4`。
-
-本机 8 个动作模板实测全部 `COHERENT`（diff_subject 2.1–3.3、cv ≤0.41、0 重复帧、闪烁 ≤1.3%）；无背景纯色画布同样判 COHERENT（整帧口径会误判 —— 同一支 nod：diff_mean 0.27 / diff_subject 2.11）。重复帧按 5% 容忍（动作收尾的定格帧不算冻结），超过才判 freeze；纯静态片仍是 `NEEDS_WORK`。
-
-### 轨迹驱动（`core/traj.py`）
-
-8 个模板是固定动作；要让木偶照着某支现成片子打拳/挥手，就用轨迹驱动——先从片子里把运动抽成**事件**，再用事件驱动形变（不是逐帧抠动作，所以不会漂移）。
-
-```bash
-# ① 抽轨迹：视频给路径，也可以直接给一帧目录（png 序列）
-python -m core.traj extract D:/ref/punch.gif --out traj.json --fps 10 --mode skin
-#   motion（默认）：帧差前景，任何主体都能用（走/跳/挥）
-#   skin          ：肤色 prior + 静态肤色剔除，专治「手和脸肤色一样、帧差糊成一团」
-
-# ② 出片：事件 → 冲量曲线（0.05s 起手 / 0.15s 指数衰减）驱动抬臂·倾斜·挤压·前倾，
-#    再叠冲击线与递减抖动；出片自动跑连贯性体检
-python -m core.traj apply --sprite hero.png --traj traj.json --out out/punch.mp4 \
-    --loops 2 --bg assets/bg_cornfield.png --sheet out/sheet.png
-```
-
-`traj.json` 里存 `summary`（帧数/尺寸/fps/检测率/左右计数）+ 每帧质心·面积·主轴角·速度 + `events`（面积局部峰，带 `strength`）。
-
-实测（`_traj_test/fish` 51 帧 320×426 @10fps → 企鹅立绘）：检测率 98%、12 个事件、左右 26/24；`--loops 2` 出 10.92s / 262 帧 / 720²@24fps，`diff_subject 9.03 · cv 0.58 · 0 重复帧 · COHERENT`（旧一次性脚本是 263 帧 / 10.96s / 10.17，同量级）。回归：`python tests/traj_check.py`。
-
-### 图形入口（双击即用）
+**只保留生图主线**；SD WebUI 的界面不再出现（后端以 `--nowebui` 无界面启动，`http://127.0.0.1:7860/` 实测 404）。
 
 ```
-启动NeoForgeSD.cmd   →  自动拉起 SD1.5 后端 + 控制台，并打开 http://127.0.0.1:8899
-停止NeoForgeSD.cmd   →  只结束本项目的进程
+启动NeoForgeSD-出图.cmd  →  起生图服务，打开 http://127.0.0.1:8899/   ← 唯一入口
+启动NeoForgeSD.cmd       →  同上（保留老习惯）
+停止NeoForgeSD.cmd       →  结束生图服务与 SD 后端
 ```
 
-页面四块：① 出图（txt2img）② 动作·SD 图生视频（AnimateDiff）③ 木偶动作（puppet，含连贯性自检）④ 结果播放/下载。
+小抄：页面里 `文生图 / 图生图` 两个页签；想直接落到图生图就开 `http://127.0.0.1:8899/?mode=i2i`。
 
-接口（也方便脚本调）：
+> **视频能力已归档（2026-10-19）**：木偶动作 / AnimateDiff / 轨迹驱动全部移到 `_parked/video/`，
+> 代码原样保留但**不参与启动、不进冒烟**。要恢复：`ui_console.py → ui/console.py`、
+> `core_video/ → core/video/`、`shim_motion|quality|traj.py → core/`、`traj_check.py → tests/`，
+> 再把 `启动NeoForgeSD-视频.cmd` 放回根目录即可。历史实测数据（8 模板全 COHERENT、轨迹驱动 12 事件）随文件一起保留。
+
+**生图（`ui/image_app.py` + `ui/image_page.html`，8899，零视频依赖）** —— 把 SD 里能通过 API 做的功能全搬过来，按 **4 组** 摆：
+
+| 组 | 里面有什么 | 对应 SD |
+|---|---|---|
+| **① 创作** | 文生图 / 图生图 / **局部重绘（蒙版笔刷）**；底部「高级」= ADetailer 面部修复 · LoRA · 高清修复；右侧画布 | txt2img / img2img / inpaint / ADetailer / LoRA / Hires.fix |
+| **② 后期** | 放大（2/3/4×、4x-AnimeSharp…）+ **GFPGAN / CodeFormer 修脸** + 选型经验 | Extras |
+| **③ 模型** | 底模热切换 · **VAE 切换** · CLIP skip · 采样器/调度器 | Settings / checkpoint 选择 |
+| **④ 资产** | 历史（点图回填） · **PNG 信息（读参数并回填表单）** · 打开产物目录 | PNG Info |
+
+- 尺寸预设带实测耗时（512²≈6s · 768²≈19s · 768×1344≈62s）；1/2/4/8 张串行不涨显存
+- 局部重绘：画布上直接涂蒙版（笔刷大小/羽化/遮罩底可调），只重绘涂过的地方（实测蒙版外像素差 0.07，蒙版内 42.5）
+- 全量功能对照与「不做什么」见 `FEATURES-SD.md`
+
+**后端由谁管**：页面打开时若检测到后端没跑，会自动以 `--nowebui` 拉起（60–120 秒，顶栏显示「后端启动中 xx s」）；
+「停止后端」可释放显存。`--nowebui` 只是不生成 WebUI 页面，**扩展脚本照常加载**（实测 `/sdapi/v1/scripts` 里 `adetailer` / `animatediff` / `controlnet` 都在，ADetailer 走 `alwayson_scripts` 正常生效）。
+
+**默认参数 = 老 SD WebUI 的基线**（对着 `ui-config.json` / `config.json` 核过）：`512×512` · 20 步 · `DPM++ 2M` + `karras` · CFG 7 · CLIP skip 2 · VAE `vae-ft-mse-840000-ema-pruned` · Hires off。
+SD1.5 在 768² 以上容易被拉长/崩肢体 —— 想出大图请用「放大」或「高清修复」，别直接拉分辨率。
+
+接口（脚本也能调）：
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/status` | 后端在线、底模、AnimateDiff、动作模板 |
-| POST | `/api/image` | 出图，返回 `job_id` |
-| POST | `/api/motion` | AnimateDiff 图生视频 |
-| POST | `/api/puppet` | 木偶动作（`action` / `dur` / `fps` / `size` / `bg`），完成后带 `coherence` |
-| GET | `/api/job/<id>` | 轮询进度与产物（`media_url`） |
+| GET | `/api/status` | 在线、当前底模、模型/LoRA/采样器/调度器/放大模型清单、后端启动状态 |
+| POST | `/api/image` | 文生图（`n` 张串行、`loras[]`、`hires{}`） |
+| POST | `/api/img2img` | 重绘（`image_b64` + `denoise`） |
+| POST | `/api/upscale` | 放大（`upscaler` + `scale`） |
+| POST | `/api/model` | 切换底模 |
+| POST | `/api/vae` | 切换 VAE（本机 6 个） |
+| POST | `/api/pnginfo` | 从图读参数（PNG Info） |
+| POST | `/api/options` | 全局选项（目前是 `clip_skip`） |
+| POST | `/api/start_sd` / `/api/stop_sd` | 拉起 / 停止无界面后端 |
+| POST | `/api/open_folder` | 打开产物目录 |
+| GET | `/api/history?limit=30` | 出图历史（含参数，可回填） |
+| GET | `/api/job/<id>` | 轮询进度与产物（`image_urls`） |
+| GET | `/files/<name>` | 产物文件 |
+
 
 ### 自检（`tests/smoke.py`）
 
@@ -154,7 +152,9 @@ python -m core.traj apply --sprite hero.png --traj traj.json --out out/punch.mp4
 python tests/smoke.py     # 全仓 py 编译 + node --check bridge + 起控制台走完整 HTTP 链路
 ```
 
-不需要 SD 后端、不需要显卡：`/api/status` → 首页 HTML → `POST /api/puppet` 出片 → 轮询 → 下载 mp4 验 `ftyp` → 未知 job 要 404 → 无后端时 `/api/motion` 要 503。约 13 秒跑完，结果写 `smoke.json`（`NEOFORGE_TEST_OUT` 可指定目录）。
+不需要 SD 后端、不需要显卡、不需要视频依赖：`/api/status`（离线但字段完整）→ 首页三区块（文生图 / 重绘 / 放大 + LoRA/高清修复）→ `/api/history` → 无后端时 `/api/image`、`/api/img2img`、`/api/upscale`、`/api/model` 都要 503 → 未知 job 要 404 → 页面里不能残留 `puppet`/`/api/motion`。约 15 秒跑完，结果写 `smoke.json`（`NEOFORGE_TEST_OUT` 可指定目录）。
+
+> 冒烟会把自己的 `NEOFORGE_SD_API` 指向关闭端口（默认 `http://127.0.0.1:9`），所以**本机 SD 正在跑也能跑冒烟**；要连真后端测，用 `NEOFORGE_TEST_SD_API=http://127.0.0.1:7860`。
 
 ---
 
@@ -199,12 +199,15 @@ D:\AIGC\comfyui\venv\Scripts\python.exe tools/checkpoint_split_fp8.py <checkpoin
 ## 目录
 
 ```
-manhua.py            # 出图调度器（入口）
-core/                # 双后端 HTTP 客户端 + 动作引擎(motion) + 连贯性体检(quality) + 轨迹驱动(traj)
-bridge/              # MCP 桥（node，含 py/ 辅助脚本）
-tests/               # 自检：smoke.py（链路冒烟）、traj_check.py（轨迹驱动回归）
+manhua.py            # 出图调度器（图像主线 CLI）
+ui/image_app.py      # 生图前端（8899，零视频依赖；SD 后端由它无界面拉起）
+core/image/          # comfy_client + sdclient —— 出图主线（ComfyUI / NeoForge WebUI 客户端）
+core/*.py            # 同名兼容 shim：旧 import 照旧可用
+bridge/              # MCP 桥（node，含 py/ 辅助脚本；支持 NEOFORGE_BRIDGE_LINE 分线）
+tests/               # 自检：smoke.py（生图线端到端冒烟）
 tools/               # 模型下载 / checkpoint 拆分(fp8) / ComfyUI 自检等小工具
 workflows/           # 现成工作流模板（SDXL 竖屏 fp8 等）
+Parked: _parked/video/   # 视频能力归档（木偶 / AnimateDiff / 轨迹驱动，不参与启动）
 spike/               # 实测/基准脚本（选型依据留痕）
 ```
 

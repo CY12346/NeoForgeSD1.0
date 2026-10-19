@@ -5,14 +5,14 @@ import os
 import subprocess
 import sys
 
-PATTERNS = ("console.py", "webui.py")
+PATTERNS = ("image_app.py", "webui.py")
 
 
 def _match(cmdline):
     low = (cmdline or "").lower().replace("\\", "/")
-    if "console.py" in low and ("ui/console.py" in low or "neoforgesd" in low):
+    if "image_app.py" in low and (("ui/image_app.py" in low) or ("neoforgesd" in low)):
         return True
-    if "webui.py" in low and ("7860" in low or "sd-old-aki" in low):
+    if "webui.py" in low and (("7860" in low) or ("sd-old-aki" in low)):
         return True
     return False
 

@@ -502,103 +502,6 @@ const TOOLS = [
     },
   },
   {
-    name: "video_generate",
-    description:
-      "Generate a VIDEO from the local Stable Diffusion + AnimateDiff. Text-to-video, or image-to-video when 'init_image' is given. Returns an MP4 path. Needs the SD WebUI running. " +
-      "PERFORMANCE: on this machine (RTX 3050 Laptop, 4GB) AnimateDiff runs ~1 min per step for 8 frames at 512x512, so steps=12 means ~12 minutes. " +
-      "For quick iteration drop to width/height 384-448, steps 6-8, video_length 8-16, and add a step-distillation LoRA to the prompt: " +
-      "'<lora:hyper加速/Hyper-SD15-8steps-lora:1>' (8 steps) or '<lora:LCM加速/LCM_LoRA_SDv15:1>' (4-6 steps, pair with sampler 'LCM').",
-    inputSchema: {
-      type: "object",
-      properties: {
-        prompt: { type: "string" },
-        negative_prompt: { type: "string", default: "lowres, bad anatomy, worst quality, watermark, text" },
-        init_image: { type: "string", description: "Optional absolute path — enables image-to-video (img2img motion)" },
-        motion_model: { type: "string", default: "mm_sd15_v3.safetensors" },
-        video_length: { type: "integer", default: 16, description: "frames (16 is fast, 24-32 smoother)" },
-        fps: { type: "integer", default: 8 },
-        closed_loop: { type: "string", default: "R-P" },
-        formats: {
-          type: "array",
-          items: { type: "string", enum: ["MP4", "GIF", "WEBM", "WEBP", "PNG"] },
-          description: "Output formats AnimateDiff should produce (default MP4 + GIF)",
-        },
-        denoising_strength: { type: "number", default: 0.6 },
-        width: { type: "integer", default: 512 },
-        height: { type: "integer", default: 512 },
-        steps: { type: "integer", default: 20 },
-        cfg_scale: { type: "number", default: 7 },
-        sampler_name: { type: "string", default: "DPM++ 2M" },
-        scheduler: { type: "string", default: "karras", description: "NeoForge scheduler." },
-        seed: { type: "integer", default: -1 },
-        out_name: { type: "string" },
-      },
-      required: ["prompt"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "video_probe",
-    description: "Inspect any media file with ffprobe: duration, resolution, fps, codecs, audio streams, bitrate. Use before cutting/compressing.",
-    inputSchema: {
-      type: "object",
-      properties: { input: { type: "string", description: "Absolute media path" } },
-      required: ["input"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "video_ffmpeg",
-    description:
-      "Video/audio processing with the local ffmpeg (v7.1, x264/x265/VP9/AV1/ass). Named ops: cut, concat, convert, compress, gif, frames, audio, mute, replace_audio, speed, resize, thumbnail, normalize, watermark, subtitles, custom. Returns the output path.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        op: {
-          type: "string",
-          enum: ["cut", "concat", "convert", "compress", "gif", "frames", "audio", "mute",
-                 "replace_audio", "speed", "resize", "thumbnail", "normalize", "watermark", "subtitles", "custom"],
-        },
-        input: { type: "string", description: "Input file (or array for concat: use 'inputs')" },
-        inputs: { type: "array", items: { type: "string" }, description: "For 'concat': ordered list of files" },
-        audio: { type: "string", description: "For 'replace_audio': audio file path" },
-        image: { type: "string", description: "For 'watermark': watermark image path" },
-        subs: { type: "string", description: "For 'subtitles': .srt/.ass file path" },
-        output: { type: "string", description: "Output path (default: new run folder)" },
-        start: { type: "number", default: 0, description: "cut start seconds" },
-        end: { type: "number", description: "cut end seconds" },
-        reencode: { type: "boolean", default: false, description: "cut: true = frame-accurate re-encode" },
-        crf: { type: "number", description: "quality (18 high .. 30 small)" },
-        preset: { type: "string" },
-        fps: { type: "number", description: "gif / frames" },
-        duration: { type: "number", default: 10, description: "gif: seconds to capture (default 10, keep it short — GIFs are heavy)" },
-        width: { type: "integer" },
-        height: { type: "integer" },
-        speed: { type: "number", description: "speed multiplier, e.g. 1.5 or 0.5" },
-        time: { type: "number", description: "thumbnail / frames: timestamp in seconds" },
-        args: { type: "array", items: { type: "string" }, description: "For 'custom': raw ffmpeg args" },
-      },
-      required: ["op"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "blender_run",
-    description:
-      "Run Blender headless (background) with a Python script — for rendering image sequences, procedural assets, turntables, or converting 3D to video frames. Pass a script path; optional .blend file.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        script: { type: "string", description: "Absolute path of the Python script to run inside Blender" },
-        blend: { type: "string", description: "Optional .blend file to open first" },
-        args: { type: "array", items: { type: "string" }, description: "Extra args passed after '--' to the script" },
-        timeout_sec: { type: "integer", default: 1800 },
-      },
-      required: ["script"],
-      additionalProperties: false,
-    },
-  },
-  {
     name: "tts_speak",
     description:
       "Text-to-speech to an MP3 file. Uses edge-tts (free, offline-installable, many Chinese voices) or GPT-SoVITS when engine='gptsovits'. For video voice-over.",
@@ -879,218 +782,6 @@ const handlers = {
     return { text: `image_process '${a.op}' -> ${payload.outputs.length} file(s)\n` + payload.outputs.map((p) => "  " + p).join("\n"), paths: payload.outputs };
   },
 
-  async video_generate(a) {
-    const bad = await requireSd();
-    if (bad) return bad;
-    const dir = await newRunDir("vid");
-    const base = a.out_name || "video";
-    const isI2V = !!a.init_image;
-
-    const formats = a.formats?.length ? a.formats : ["MP4", "GIF"];
-    const adArgs = {
-      model: a.motion_model,
-      enable: true,
-      video_length: a.video_length,
-      fps: a.fps,
-      loop_number: 0,
-      closed_loop: a.closed_loop,
-      batch_size: a.video_length,
-      stride: 1,
-      overlap: -1,
-      format: formats,
-      interp: "Off",
-      interp_x: 10,
-      video_source: null,
-      video_path: "",
-      mask_path: "",
-      latent_power: 1,
-      latent_scale: 32,
-      last_frame: null,
-    };
-
-    const body = {
-      prompt: a.prompt,
-      negative_prompt: a.negative_prompt,
-      width: a.width, height: a.height,
-      steps: a.steps, cfg_scale: a.cfg_scale,
-      sampler_name: a.sampler_name, scheduler: a.scheduler,
-      seed: a.seed,
-      batch_size: 1, n_iter: 1,
-      save_images: false,
-      alwayson_scripts: { AnimateDiff: { args: [adArgs] } },
-    };
-
-    let endpoint = "/sdapi/v1/txt2img";
-    if (isI2V) {
-      endpoint = "/sdapi/v1/img2img";
-      const b64 = (await fsp.readFile(a.init_image)).toString("base64");
-      body.init_images = [b64];
-      body.denoising_strength = a.denoising_strength;
-    }
-
-    // AnimateDiff writes to <webui>/outputs/txt2img-images/AnimateDiff/<date>/
-    const adDir = path.join(CFG.sdRoot, "outputs", "txt2img-images", "AnimateDiff");
-    const t0 = Date.now();
-
-    const r = await httpJson(`${CFG.sdUrl}${endpoint}`, { method: "POST", body, timeoutMs: 3600000 });
-
-    // In API mode AnimateDiff encodes the finished VIDEOS into r.images (base64);
-    // frames only appear if 'Frame' is among the requested formats. Classify by
-    // magic bytes rather than position — the extension appends in its own order.
-    const videos = [];
-    const frames = [];
-    const notes = [];
-    for (let i = 0; i < (r.images || []).length; i++) {
-      const kind = sniffB64(r.images[i]);
-      if (kind.ext === "png") {
-        const p = path.join(dir, `frame_${String(frames.length + 1).padStart(4, "0")}.png`);
-        await writeB64(r.images[i], p);
-        frames.push(p);
-      } else if (["mp4", "gif", "webm", "webp"].includes(kind.ext)) {
-        const p = path.join(dir, `${base}.${kind.ext}`);
-        await writeB64(r.images[i], p);
-        videos.push(p);
-      }
-    }
-    if (videos.length) {
-      notes.push(`AnimateDiff returned ${videos.length} encoded video(s) inline: ${videos.map((v) => path.extname(v)).join(", ")}`);
-    }
-
-    // Fallback: pick up whatever AnimateDiff left on disk (its date-stamped dir).
-    if (!videos.length && fs.existsSync(adDir)) {
-      const found = [];
-      const walk = async (d) => {
-        for (const e of await fsp.readdir(d, { withFileTypes: true })) {
-          const fp = path.join(d, e.name);
-          if (e.isDirectory()) await walk(fp);
-          else if (/\.(mp4|gif|webm|webp)$/i.test(e.name)) {
-            const st = await fsp.stat(fp);
-            if (st.mtimeMs >= t0 - 5000) found.push(fp);
-          }
-        }
-      };
-      try { await walk(adDir); } catch {}
-      for (const f of found) {
-        const dest = path.join(dir, `${base}_${path.basename(f)}`);
-        await fsp.copyFile(f, dest);
-        videos.push(dest);
-      }
-      if (found.length) notes.push(`Recovered ${found.length} file(s) from AnimateDiff's output dir.`);
-    }
-
-    // Last resort: assemble frames ourselves.
-    if (!videos.length && frames.length >= 2) {
-      const out = path.join(dir, `${base}.mp4`);
-      const ff = await run(CFG.ffmpeg, ["-framerate", String(a.fps), "-i", path.join(dir, "frame_%04d.png"),
-        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-movflags", "+faststart", "-y", out], { timeoutMs: 300000 });
-      if (ff.code === 0) {
-        videos.push(out);
-        notes.push(`Assembled ${frames.length} returned frames -> ${a.fps}fps MP4.`);
-      } else {
-        notes.push(`ffmpeg assembly failed: ${ff.stderr.slice(-300)}`);
-      }
-      const g = path.join(dir, `${base}.gif`);
-      const ff2 = await run(CFG.ffmpeg, ffArgs("gif", { input: path.join(dir, "frame_%04d.png"), fps: a.fps, width: a.width, duration: 1 + frames.length / a.fps, output: g }), { timeoutMs: 300000 });
-      if (ff2.code === 0) videos.push(g);
-    }
-
-    const secs = ((Date.now() - t0) / 1000).toFixed(1);
-    const files = [...videos, ...frames];
-    let text = `video_generate (${isI2V ? "image-to-video" : "text-to-video"}) finished in ${secs}s\n`;
-    text += `motion model: ${a.motion_model}   frames: ${a.video_length} @ ${a.fps}fps   ${a.width}x${a.height}\n`;
-    if (notes.length) text += notes.map((n) => "  * " + n).join("\n") + "\n";
-    if (!files.length) {
-      text += `Nothing was produced — the AnimateDiff extension returned no video and wrote no file.\n`;
-      text += `Raw info: ${String(r.info || "").slice(0, 600)}\n`;
-    } else {
-      if (videos.length) text += `Videos:\n` + videos.map((p) => "  " + p).join("\n") + "\n";
-      if (frames.length) text += `Frames (${frames.length}):\n  ${frames[0]}\n  ...\n  ${frames[frames.length - 1]}\n`;
-    }
-    return { text, paths: videos.length ? videos : frames };
-  },
-
-  async video_probe(a) {
-    if (!fs.existsSync(a.input)) return `Not found: ${a.input}`;
-    const r = await run(CFG.ffprobe, [
-      "-v", "error", "-print_format", "json",
-      "-show_format", "-show_streams", a.input,
-    ], { timeoutMs: 120000 });
-    if (r.code !== 0) return `ffprobe failed:\n${r.stderr}`;
-    const j = JSON.parse(r.stdout);
-    const v = (j.streams || []).find((s) => s.codec_type === "video");
-    const au = (j.streams || []).find((s) => s.codec_type === "audio");
-    const lines = [
-      `File: ${path.basename(a.input)}`,
-      `Size: ${(Number(j.format?.size || 0) / 1048576).toFixed(2)} MB`,
-      `Duration: ${Number(j.format?.duration || 0).toFixed(2)} s`,
-      `Bitrate: ${(Number(j.format?.bit_rate || 0) / 1000).toFixed(0)} kbps`,
-      `Container: ${j.format?.format_name}`,
-    ];
-    if (v) {
-      let fps = "";
-      const [n, d] = String(v.avg_frame_rate || v.r_frame_rate || "0/1").split("/").map(Number);
-      if (d) fps = (n / d).toFixed(3);
-      lines.push(`Video: ${v.codec_name} ${v.width}x${v.height} ${fps} fps, pix_fmt=${v.pix_fmt}`);
-    }
-    if (au) lines.push(`Audio: ${au.codec_name} ${au.sample_rate} Hz, ${au.channels} ch`);
-    else lines.push("Audio: none");
-    return lines.join("\n");
-  },
-
-  async video_ffmpeg(a) {
-    const dir = a.output ? null : await newRunDir("ff");
-
-    // concat needs a list file
-    if (a.op === "concat") {
-      const ins = a.inputs || (a.input ? [a.input] : []);
-      if (ins.length < 2) return "concat needs at least 2 files in 'inputs'.";
-      const missing = ins.filter((f) => !fs.existsSync(f));
-      if (missing.length) return "Not found:\n" + missing.join("\n");
-      const listFile = path.join(dir, "concat.txt");
-      await fsp.writeFile(listFile, ins.map((f) => `file '${f.replace(/'/g, "'\\''")}'`).join("\n"), "utf8");
-      a.listFile = listFile;
-      a.output = a.output || path.join(dir, "concat.mp4");
-    }
-
-    if (!a.output) {
-      const src = path.parse(a.input || (a.inputs && a.inputs[0]) || "out").name;
-      const ext = { gif: "gif", audio: "mp3", frames: "png", thumbnail: "jpg" }[a.op] || "mp4";
-      a.output = path.join(dir, `${src}_${a.op}.${ext}`);
-    }
-
-    if (a.input && a.op !== "concat" && !fs.existsSync(a.input)) return `Not found: ${a.input}`;
-    if (a.image && !fs.existsSync(a.image)) return `Watermark not found: ${a.image}`;
-    if (a.subs && !fs.existsSync(a.subs)) return `Subtitles not found: ${a.subs}`;
-
-    let args;
-    try { args = ffArgs(a.op, a); } catch (e) { return String(e.message); }
-    const r = await run(CFG.ffmpeg, args, { timeoutMs: 3600000 });
-    if (r.code !== 0) {
-      return `ffmpeg '${a.op}' failed (exit ${r.code}):\n${(r.stderr || "").slice(-1200)}`;
-    }
-    let info = "";
-    if (fs.existsSync(a.output)) {
-      const st = await fsp.stat(a.output);
-      info = `  (${(st.size / 1048576).toFixed(2)} MB)`;
-    }
-    return { text: `ffmpeg '${a.op}' done -> ${a.output}${info}`, paths: [a.output] };
-  },
-
-  async blender_run(a) {
-    if (!fs.existsSync(a.script)) return `Script not found: ${a.script}`;
-    const args = ["--background"];
-    if (a.blend) {
-      if (!fs.existsSync(a.blend)) return `Blend not found: ${a.blend}`;
-      args.push(a.blend);
-    }
-    args.push("--python", a.script);
-    if (a.args?.length) args.push("--", ...a.args);
-    const r = await run(CFG.blender, args, { timeoutMs: (a.timeout_sec || 1800) * 1000 });
-    const tail = (r.stdout + "\n" + r.stderr).trim().split("\n").slice(-40).join("\n");
-    if (r.code !== 0) return `blender_run failed (exit ${r.code}):\n${tail}`;
-    return `blender_run ok (exit 0):\n${tail}`;
-  },
-
   async tts_speak(a) {
     const dir = await newRunDir("tts");
     const out = path.join(dir, (a.out_name || "speech") + ".mp3");
@@ -1315,6 +1006,31 @@ asyncio.run(main())
 };
 
 /* ------------------------------------------------------------------ *
+ * 分线开关（出图=主线，视频=支线）
+ *   NEOFORGE_BRIDGE_LINE=image  只暴露图像链路工具
+ *   NEOFORGE_BRIDGE_LINE=video  只暴露视频 / Blender / 语音工具
+ *   不设或 all             → 全部（默认，向后兼容）
+ * 只影响 tools/list；handlers 本身不删，脚本直调不受影响。
+ * ------------------------------------------------------------------ */
+const LINE = String(process.env.NEOFORGE_BRIDGE_LINE || "all").toLowerCase();
+const LINE_SETS = {
+  image: new Set([
+    "aigc_status", "sd_start", "sd_models", "sd_set_model",
+    "image_generate", "image_edit", "image_upscale", "image_process", "comfy_generate",
+  ]),
+  video: new Set([
+    "aigc_status",
+    "tts_speak", "voice_clone", "gsv_start",
+  ]),
+};
+const ACTIVE_TOOLS = LINE_SETS[LINE] ? TOOLS.filter((t) => LINE_SETS[LINE].has(t.name)) : TOOLS;
+if (LINE_SETS[LINE]) {
+  log(`tool line = ${LINE} · ${ACTIVE_TOOLS.length}/${TOOLS.length} tools`);
+} else if (LINE !== "all") {
+  log(`unknown NEOFORGE_BRIDGE_LINE='${LINE}' — falling back to all tools`);
+}
+
+/* ------------------------------------------------------------------ *
  * Defaults: MCP does not apply JSON-Schema defaults for us, so merge
  * every declared default into the incoming args once, centrally.
  * ------------------------------------------------------------------ */
@@ -1345,11 +1061,17 @@ const server = new Server(
   { capabilities: { tools: {} } }
 );
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
+server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: ACTIVE_TOOLS }));
 
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: rawArgs = {} } = req.params;
   const args = withDefaults(name, rawArgs);
+  if (LINE_SETS[LINE] && !LINE_SETS[LINE].has(name)) {
+    return {
+      content: [{ type: "text", text: `Tool '${name}' 不在当前分线 '${LINE}' 里（设 NEOFORGE_BRIDGE_LINE=all 可全开）` }],
+      isError: true,
+    };
+  }
   const fn = handlers[name];
   if (!fn) {
     return { content: [{ type: "text", text: `Unknown tool: ${name}` }], isError: true };

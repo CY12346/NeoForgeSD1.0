@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
-"""NeoForgeSD end-to-end smoke test (no SD backend needed).
+"""NeoForgeSD 生图线端到端冒烟（不需要 SD 后端、不需要显卡、不需要视频依赖）
 
-S1  byte-compile every python module + node syntax check of bridge
-S2  start ui/console.py on a scratch port, then over real HTTP:
-      GET /api/status, GET /, POST /api/puppet -> poll -> media, 404 path,
-      POST /api/motion without backend (expect 503)
-Writes JSON evidence to $NEOFORGE_TEST_OUT/smoke.json (default: a temp dir).
+S1  byte-compile 全仓 python + node --check bridge
+S2  起 ui/image_app.py（把 SD_API 指向关闭端口，保证「无后端」路径确定），真 HTTP 走一遍：
+      /api/status（离线但目录/字段完整）、首页三区块、/api/history、
+      /api/image | /api/img2img | /api/upscale | /api/model 无后端必须 503、未知 job 必须 404
+证据写 $NEOFORGE_TEST_OUT/smoke.json（默认临时目录）
 Run:  python tests/smoke.py
 """
-import base64
 import json
 import os
 import py_compile
@@ -23,21 +22,14 @@ import urllib.request
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.environ.get("NEOFORGE_TEST_OUT") or tempfile.mkdtemp(prefix="nf_report_")
-PORT = int(os.environ.get("NEOFORGE_TEST_PORT", "8898"))
+PORT = int(os.environ.get("NEOFORGE_TEST_PORT", "8897"))
 BASE = "http://127.0.0.1:%d" % PORT
-
-_CANDIDATES = [
-    os.environ.get("NEOFORGE_TEST_SPRITE", ""),
-    os.path.join(REPO, "tests", "sprite_hero.png"),
-    r"D:/aicg/_motiontest/hero.png",
-]
-SPRITE = next((c for c in _CANDIDATES if c and os.path.isfile(c)), "")
 os.makedirs(OUT, exist_ok=True)
 res = {"steps": {}, "pass": True}
 
 
 def note(step, data):
-    res["steps"][step] = data
+    res["steps"].setdefault(step, {}).update(data)
 
 
 def fail(step, why):
@@ -49,7 +41,7 @@ def fail(step, why):
 try:
     files = []
     for root, dirs, fs in os.walk(REPO):
-        dirs[:] = [d for d in dirs if d not in (".git", "__pycache__")]
+        dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", "_parked")]
         files += [os.path.join(root, f) for f in fs if f.endswith(".py")]
     bad = []
     for f in files:
@@ -72,17 +64,20 @@ try:
 except Exception as e:
     fail("S1_compile", repr(e))
 
-# ------------------------------------------------------- S2 live console
+# ------------------------------------------------------- S2 live image app
 work = tempfile.mkdtemp(prefix="nf_smoke_")
 env = os.environ.copy()
-env.update({"NEOFORGE_CONSOLE_PORT": str(PORT), "NEOFORGE_WORK": work, "PYTHONUTF8": "1"})
-proc = subprocess.Popen([sys.executable, "ui/console.py"], cwd=REPO, env=env,
+env.update({
+    "NEOFORGE_IMAGE_PORT": str(PORT), "NEOFORGE_IMAGE_WORK": work, "PYTHONUTF8": "1",
+    # 冒烟必须「无后端」才有确定性：指向关闭端口
+    "NEOFORGE_SD_API": os.environ.get("NEOFORGE_TEST_SD_API", "http://127.0.0.1:9"),
+})
+proc = subprocess.Popen([sys.executable, "ui/image_app.py"], cwd=REPO, env=env,
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
 
 def get(path, raw=False, timeout=30):
-    req = urllib.request.Request(BASE + path)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with urllib.request.urlopen(BASE + path, timeout=timeout) as r:
         body = r.read()
         return r.status, dict(r.headers), body if raw else json.loads(body.decode("utf-8"))
 
@@ -101,74 +96,99 @@ try:
     up = False
     for _ in range(80):
         try:
-            s = socket.create_connection(("127.0.0.1", PORT), timeout=1)
-            s.close()
+            socket.create_connection(("127.0.0.1", PORT), timeout=1).close()
             up = True
             break
         except OSError:
             time.sleep(0.25)
     note("S2_boot", {"port": PORT, "up": up})
     if not up:
-        raise RuntimeError("console did not listen")
+        raise RuntimeError("image_app did not listen")
 
     st_code, _, st = get("/api/status")
-    note("S2_status", {"code": st_code, "online": st.get("online"), "model": st.get("model"),
-                       "animatediff": st.get("animatediff"), "actions": len(st.get("actions") or [])})
-    if st_code != 200 or not st.get("actions"):
-        fail("S2_status", "status payload unusable")
+    note("S2_status", {"code": st_code, "online": st.get("online"),
+                       "backend": (st.get("backend") or {}).get("state"),
+                       "work_ok": st.get("work") == work, "api": st.get("api")})
+    if st_code != 200 or st.get("online") is not False:
+        fail("S2_status", "expected offline status payload")
+    if (st.get("backend") or {}).get("state") != "idle":
+        fail("S2_status", "backend should be idle without SD")
 
-    h_code, h_hdr, h_body = get("/", raw=True)
+    h_code, _, h_body = get("/", raw=True)
     html = h_body.decode("utf-8", "replace")
-    note("S2_page", {"code": h_code, "bytes": len(h_body),
-                     "has_puppet_form": "/api/puppet" in html,
-                     "title_ok": "NeoForgeSD" in html})
-    if h_code != 200 or "/api/puppet" not in html:
-        fail("S2_page", "page missing puppet form")
+    marks = {
+        "groups": all(x in html for x in ("① 创作", "② 后期", "③ 模型", "④ 资产")),
+        "txt2img": "文生图" in html,
+        "img2img": "图生图" in html and "/api/img2img" in html,
+        "inpaint": "局部重绘" in html and "mask_b64" in html,
+        "upscale": "/api/upscale" in html,
+        "lora_hires": "LoRA" in html and "高清修复" in html,
+        "adetailer": "面部修复" in html,
+        "model_switch": "/api/model" in html,
+        "vae": "/api/vae" in html,
+        "pnginfo": "/api/pnginfo" in html,
+        "no_video": "puppet" not in html and "/api/motion" not in html,
+        # 提示词助手（1.0.1）：中⇄英 / 词库 / 补全 / 风格
+        "prompt_helper": all(x in html for x in ("提示词助手", "/api/translate",
+                                                 "/api/promptlib", "/api/suggest")),
+    }
+    note("S2_page", {"code": h_code, "bytes": len(h_body), "marks": marks})
+    if h_code != 200 or not all(marks.values()):
+        fail("S2_page", "page missing expected blocks: %s" % [k for k, v in marks.items() if not v])
 
-    code, j = post("/api/motion", {"image_b64": "", "prompt": "x"})
-    note("S2_motion_guard", {"code": code, "error": j.get("error")})
-    if code != 503:
-        fail("S2_motion_guard", "expected 503 without SD backend")
+    hh_code, _, hh = get("/api/history?limit=10")
+    note("S2_history", {"code": hh_code, "items": len(hh.get("items") or [])})
+    if hh_code != 200 or not isinstance(hh.get("items"), list):
+        fail("S2_history", "history endpoint unusable")
 
-    sprite = SPRITE
-    if not sprite:  # 没有现成立绘就画一个：冒烟只验链路，不验画面
-        from PIL import Image as _I, ImageDraw as _D
-        sprite = os.path.join(OUT, "sprite_generated.png")
-        im = _I.new("RGB", (400, 600), (255, 255, 255))
-        d = _D.Draw(im)
-        d.ellipse((120, 60, 280, 220), fill=(70, 110, 200))
-        d.rounded_rectangle((140, 200, 260, 430), 40, fill=(230, 120, 60))
-        d.ellipse((150, 430, 250, 520), fill=(60, 60, 70))
-        im.save(sprite)
-        note("S2_sprite", {"generated": sprite})
-    code, j = post("/api/puppet", {"sprite_path": sprite, "action": "nod", "dur": 1.5,
-                                   "fps": 24, "size": "480x480", "seed": 11})
-    note("S2_puppet_submit", {"code": code, "job": j})
-    jid = j.get("job_id")
-    if not jid:
-        raise RuntimeError("puppet job not accepted")
+    for path, payload, label in (
+        ("/api/image", {"prompt": "x"}, "image"),
+        ("/api/img2img", {"prompt": "x", "image_b64": ""}, "img2img"),
+        ("/api/upscale", {"image_b64": ""}, "upscale"),
+        ("/api/model", {"name": "whatever"}, "model"),
+        ("/api/vae", {"name": "whatever"}, "vae"),
+        ("/api/pnginfo", {"image_b64": "x"}, "pnginfo"),
+    ):
+        code, j = post(path, payload)
+        note("S2_guard_" + label, {"code": code, "error": (j.get("error") or "")[:120]})
+        if code != 503:
+            fail("S2_guard_" + label, "expected 503 without SD backend, got %s" % code)
 
-    t0 = time.time()
-    job = {}
-    while time.time() - t0 < 180:
-        c, _, job = get("/api/job/" + jid)
-        if job.get("state") in ("done", "error"):
-            break
-        time.sleep(0.5)
-    note("S2_puppet_job", {"state": job.get("state"), "elapsed": job.get("elapsed"),
-                           "media_url": job.get("media_url"),
-                           "coherence": job.get("coherence")})
-    if job.get("state") != "done":
-        fail("S2_puppet_job", "job did not finish: %s" % job.get("error"))
-    else:
-        q = job.get("coherence") or {}
-        if q.get("verdict") != "COHERENT":
-            fail("S2_puppet_job", "coherence %s" % q.get("verdict"))
-        m_code, m_hdr, m_body = get(job["media_url"], raw=True)
-        note("S2_media", {"code": m_code, "bytes": len(m_body),
-                          "content_type": m_hdr.get("Content-Type")})
-        if m_code != 200 or len(m_body) < 20000 or b"ftyp" not in m_body[:64]:
-            fail("S2_media", "media not a valid mp4")
+    # S3 提示词助手（词典来自本机 SD 扩展；没有 SD 后端也能用）
+    s3 = {}
+    try:
+        c, _, st3 = get("/api/i18n", timeout=60)
+        s3["i18n"] = {"code": c, "zh": st3.get("zh_tags"), "en": st3.get("en_tags"),
+                      "csv": st3.get("zh_csv"), "error": st3.get("error")}
+        if c != 200 or (st3.get("zh_tags") or 0) < 50000:
+            fail("S3_i18n", "词典没加载起来")
+        c, _, sg = get("/api/suggest?q=long_h&limit=5", timeout=30)
+        tags = [i.get("tag") for i in sg.get("items") or []]
+        s3["suggest"] = {"code": c, "tags": tags}
+        if "long_hair" not in tags:
+            fail("S3_suggest", "补全没命中 long_hair: %s" % tags)
+        c, tr = post("/api/translate", {"text": "长发，微笑的少女，俯视，森林", "dir": "zh2en"}, timeout=60)
+        s3["zh2en"] = {"code": c, "out": tr.get("out"), "elapsed": tr.get("elapsed")}
+        out = tr.get("out") or ""
+        if not all(x in out for x in ("long hair", "smile", "from above", "forest")):
+            fail("S3_zh2en", "中→英结果不对: %s" % out)
+        c, tr2 = post("/api/translate", {"text": "1girl, long_hair, smile", "dir": "en2zh"}, timeout=30)
+        s3["en2zh"] = {"code": c, "out": tr2.get("out")}
+        if "长发" not in (tr2.get("out") or ""):
+            fail("S3_en2zh", "英→中结果不对: %s" % tr2.get("out"))
+        c, _, lib = get("/api/promptlib", timeout=60)
+        n_tags = sum(len(g.get("tags") or []) for cat in lib.get("cats") or [] for g in cat.get("groups") or [])
+        s3["promptlib"] = {"code": c, "cats": len(lib.get("cats") or []), "tags": n_tags}
+        if not lib.get("cats") or n_tags < 1000:
+            fail("S3_promptlib", "词库为空或过小: %s" % n_tags)
+        c, _, sty = get("/api/styles", timeout=30)
+        s3["styles_offline"] = {"code": c, "items": len(sty.get("items") or []), "online": sty.get("online")}
+        if c != 200 or (sty.get("items") or []):
+            fail("S3_styles", "无后端时 /api/styles 应返回空 items")
+    except Exception as e:
+        s3["fatal"] = "%s: %s" % (type(e).__name__, str(e)[:300])
+        fail("S3_prompt_helper", s3["fatal"])
+    note("S3_prompt_helper", s3)
 
     try:
         get("/api/job/deadbeef")
@@ -187,7 +207,7 @@ finally:
     except Exception:
         proc.kill()
         tail = ""
-    note("S2_console_log", tail.strip().splitlines()[:12])
+    note("S2_app_log", tail.strip().splitlines()[:12])
     shutil.rmtree(work, ignore_errors=True)
 
 with open(os.path.join(OUT, "smoke.json"), "w", encoding="utf-8") as f:

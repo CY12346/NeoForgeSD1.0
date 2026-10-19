@@ -12,3 +12,5 @@ outputs/
 *.bin
 .DS_Store
 NVIDIA Corporation/
+_smoke/
+_smoke

@@ -1,30 +1,36 @@
 @echo off
-title NeoForgeSD 控制台
+title NeoForgeSD 视频（支线）
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
+set NEOFORGE_CONSOLE_PORT=8898
 cd /d "%~dp0"
 set SD_HOME=E:\sd\sd-old-aki
 
 echo ==========================================
-echo   NeoForgeSD 一键入口
-echo   动作后端 :7860   控制台 :8899
+echo   NeoForgeSD 视频（支线）
+echo   页面 :8898
 echo ==========================================
 echo.
 
 python -c "import urllib.request as u;u.urlopen('http://127.0.0.1:7860/sdapi/v1/progress',timeout=3)" 2>nul
 if %errorlevel%==0 goto backok
-echo [1/3] 启动 SD1.5 动作后端（约 60-120 秒，首次加载模型稍慢）...
+echo [1/3] 启动 SD1.5 后端（约 60-120 秒；AnimateDiff 需要带界面的启动方式）...
 start "NeoForgeSD-backend" /min cmd /c "cd /d %SD_HOME% && set HF_HUB_OFFLINE=1&& set TRANSFORMERS_OFFLINE=1&& python\python.exe webui.py --api --port 7860 --medvram --opt-sdp-attention --skip-version-check --no-half-vae"
 goto console
 :backok
 echo [1/3] 后端已在线，跳过启动
+echo       （若刚用「出图」入口起的后端，AnimateDiff 不在脚本里 —— 先用 停止NeoForgeSD.cmd 关掉再跑本入口）
 
 :console
-echo [2/3] 启动控制台 :8899 ...
-start "NeoForgeSD-console" /min cmd /c "cd /d %~dp0 && python ui\console.py"
-echo [3/3] 打开浏览器...
+python -c "import urllib.request as u;u.urlopen('http://127.0.0.1:8898/api/status',timeout=3)" 2>nul
+if %errorlevel%==0 goto openpage
+echo [2/3] 启动视频服务 :8898 ...
+start "NeoForgeSD-video" /min cmd /c "cd /d %~dp0 && python ui\console.py"
+goto openpage
+:openpage
+echo [3/3] 打开页面...
 ping -n 4 127.0.0.1 >nul
-start "" http://127.0.0.1:8899/
+start "" http://127.0.0.1:8898/#video
 echo.
-echo 已启动。要停止请运行 停止NeoForgeSD.cmd
+echo 停止：双击 停止NeoForgeSD.cmd
 ping -n 6 127.0.0.1 >nul

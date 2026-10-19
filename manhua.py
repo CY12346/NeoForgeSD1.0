@@ -47,10 +47,10 @@ import sys
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(HERE, "core"))
+sys.path.insert(0, HERE)
 
-from comfy_client import Comfy  # noqa: E402
-from sdclient import SD        # noqa: E402
+from core.image.comfy_client import Comfy  # noqa: E402
+from core.image.sdclient import SD  # noqa: E402
 
 DEFAULT_NODES = {
     "unet": "44", "clip": "45", "vae": "15",

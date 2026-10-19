@@ -17,7 +17,7 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
 
-from core import quality, traj  # noqa: E402
+from core.video import quality, traj  # noqa: E402
 
 SRC = os.environ.get("NEOFORGE_TRAJ_SRC", r"D:/aicg/_traj_test/fish")
 SPRITE = os.environ.get("NEOFORGE_TRAJ_SPRITE", r"D:/aicg/_traj_test/assets_penguin/penguin_front.png")

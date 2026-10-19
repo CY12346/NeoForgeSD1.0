@@ -1,0 +1,25 @@
+@echo off
+title NeoForgeSD（一键启动）
+set PYTHONUTF8=1
+set PYTHONIOENCODING=utf-8
+set NEOFORGE_IMAGE_PORT=8899
+cd /d "%~dp0"
+set SD_HOME=E:\sd\sd-old-aki
+
+echo ==========================================
+echo   NeoForgeSD（一键启动）
+echo   页面 :8899   SD 后端无界面，由页面自动拉起
+echo ==========================================
+echo.
+
+python -c "import urllib.request as u;u.urlopen('http://127.0.0.1:8899/api/status',timeout=3)" 2>nul
+if %errorlevel%==0 goto openpage
+echo [1/2] 启动生图服务 :8899 ...
+start "NeoForgeSD-image" /min cmd /c "cd /d %~dp0 && python ui\image_app.py"
+:openpage
+echo [2/2] 打开页面（SD 后端自动启动，首次 60-120 秒）...
+ping -n 4 127.0.0.1 >nul
+start "" http://127.0.0.1:8899/
+echo.
+echo 停止：双击 停止NeoForgeSD.cmd
+ping -n 6 127.0.0.1 >nul
