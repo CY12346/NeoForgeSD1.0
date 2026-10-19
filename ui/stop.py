@@ -12,7 +12,7 @@ def _match(cmdline):
     low = (cmdline or "").lower().replace("\\", "/")
     if "image_app.py" in low and (("ui/image_app.py" in low) or ("neoforgesd" in low)):
         return True
-    if "webui.py" in low and (("7860" in low) or ("sd-old-aki" in low)):
+    if "webui.py" in low and (("7860" in low) or ("NeoForge" in low)):
         return True
     return False
 

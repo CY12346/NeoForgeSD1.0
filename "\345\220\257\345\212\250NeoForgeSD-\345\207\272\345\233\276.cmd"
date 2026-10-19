@@ -4,7 +4,7 @@ set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
 set NEOFORGE_IMAGE_PORT=8899
 cd /d "%~dp0"
-set SD_HOME=E:\sd\sd-old-aki
+set SD_HOME=E:\NeoForge\backend
 
 echo ==========================================
 echo   NeoForgeSD ÉúÍ¼£¨Ö÷Ïß£©

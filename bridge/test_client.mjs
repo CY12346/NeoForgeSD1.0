@@ -58,26 +58,10 @@ if (want("imgproc")) {
     console.log(`\n--- source image: ${src} ---`);
     await call("image_process", { op: "info", inputs: [src] });
     await call("image_process", { op: "cover", inputs: [src], ratio: "16:9", width: 1280, height: 720, suffix: "_thumb" });
-    await call("image_process", { op: "watermark", inputs: [src], text: "视频优化专家", position: "bottomright", font_size: 42, suffix: "_wm" });
+    await call("image_process", { op: "watermark", inputs: [src], text: "NeoForgeSD", position: "bottomright", font_size: 42, suffix: "_wm" });
     await call("image_process", { op: "convert", inputs: [src], format: "jpg", quality: 85 });
   } else {
     console.log(`\n[sink] source image missing: ${src}`);
-  }
-}
-
-if (want("video")) {
-  const vid = "C:/Users/咸鱼一条/Downloads/QQ20260730-215416.mp4";
-  if (fs.existsSync(vid)) {
-    await call("video_probe", { input: vid });
-    await call("video_ffmpeg", { op: "thumbnail", input: vid, time: 1, width: 640 });
-    await call("video_ffmpeg", { op: "cut", input: vid, start: 0, end: 3 });
-    await call("video_ffmpeg", { op: "gif", input: vid, fps: 10, width: 400, duration: 6 });
-    await call("video_ffmpeg", { op: "audio", input: vid });
-    await call("video_ffmpeg", { op: "compress", input: vid, crf: 30, maxWidth: 1280, preset: "veryfast" });
-    await call("video_ffmpeg", { op: "frames", input: vid, fps: 1, time: 2 });
-    await call("video_ffmpeg", { op: "resize", input: vid, width: 720, height: -2 });
-  } else {
-    console.log(`\n[sink] test video missing: ${vid}`);
   }
 }
 
@@ -95,15 +79,6 @@ if (want("sd")) {
   await call("image_generate", {
     prompt: "a red apple on a rustic wooden table, studio softbox light, product shot, 8k",
     width: 512, height: 512, steps: 12, out_name: "test_apple",
-  });
-}
-
-if (want("vidgen")) {
-  await call("video_generate", {
-    prompt: "1girl, silver hair, gentle breeze, cherry blossom petals falling, cinematic",
-    negative_prompt: "lowres, bad anatomy, worst quality, watermark, text",
-    width: 512, height: 512, steps: 12, video_length: 8, fps: 8,
-    out_name: "test_motion",
   });
 }
 
@@ -128,11 +103,6 @@ if (want("clone")) {
     prompt_lang: "zh",
     out_name: "mcp_clone",
   });
-}
-
-if (want("blender")) {
-  const script = path.join(HERE, "py", "blender_selftest.py");
-  await call("blender_run", { script, timeout_sec: 300 });
 }
 
 await client.close();

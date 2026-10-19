@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""NeoForgeSD 生图线端到端冒烟（不需要 SD 后端、不需要显卡、不需要视频依赖）
+"""NeoForgeSD 生图线端到端冒烟（不需要 SD 后端、不需要显卡、不需要额外依赖）
 
 S1  byte-compile 全仓 python + node --check bridge
 S2  起 ui/image_app.py（把 SD_API 指向关闭端口，保证「无后端」路径确定），真 HTTP 走一遍：
@@ -127,7 +127,6 @@ try:
         "model_switch": "/api/model" in html,
         "vae": "/api/vae" in html,
         "pnginfo": "/api/pnginfo" in html,
-        "no_video": "puppet" not in html and "/api/motion" not in html,
         # 提示词助手（1.0.1）：中⇄英 / 词库 / 补全 / 风格
         "prompt_helper": all(x in html for x in ("提示词助手", "/api/translate",
                                                  "/api/promptlib", "/api/suggest")),

@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""NeoForgeSD · 生图（独立应用，与视频支线彻底分开）
+"""NeoForgeSD · 生图（独立应用）
 
-为什么单独一个文件：出图不该被视频那套（numpy/PIL/形变场/ffmpeg）拖累，
-也不该为了出一张图去加载动作引擎。本文件只依赖标准库 + SD WebUI HTTP API。
+为什么单独一个文件：出图只依赖标准库 + SD WebUI HTTP API，不引入任何无关依赖。
 
 能力：
   · 模型切换（/sdapi/v1/sd-models 全量）
@@ -15,7 +14,7 @@
   · 放大 extras（4x-AnimeSharp / 4x-UltraSharp / DAT ...）
   · 历史（点图回填参数）+ 打开产物目录
 
-端口默认 8899。视频能力已归档到 _parked/video/，本文件不依赖任何视频代码。
+端口默认 8899。
 """
 import base64
 import json
@@ -43,7 +42,7 @@ except Exception as _e:                 # 词典坏了也不该拖垮出图
 
 PORT = int(os.environ.get("NEOFORGE_IMAGE_PORT", os.environ.get("NEOFORGE_CONSOLE_PORT", "8899")))
 SD_API = os.environ.get("NEOFORGE_SD_API", "http://127.0.0.1:7860").rstrip("/")
-SD_HOME = os.environ.get("NEOFORGE_SD_HOME", r"E:/sd/sd-old-aki")
+SD_HOME = os.environ.get("NEOFORGE_SD_HOME", r"E:/NeoForge/backend")
 SD_PY = os.path.join(SD_HOME, "python", "python.exe")
 WORK = os.environ.get("NEOFORGE_IMAGE_WORK", os.environ.get("NEOFORGE_WORK", r"D:/aicg/_neoforge_console"))
 os.makedirs(WORK, exist_ok=True)

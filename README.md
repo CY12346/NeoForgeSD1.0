@@ -32,7 +32,7 @@
 
 ## 它能干什么
 
-一条命令，把一整集的分镜镜头表批量出图，逐镜计时、记录 seed、命名落盘、失败不中断：
+一条命令，把一整批场景清单批量出图，逐张计时、记录 seed、命名落盘、失败不中断：
 
 ```bash
 python manhua.py --shots shots.json --backend comfy --out out_dir --limit 10
@@ -43,10 +43,10 @@ python manhua.py --shots shots.json --backend comfy --out out_dir --limit 10
 | 模块 | 文件 | 作用 |
 |---|---|---|
 | 双后端客户端 | `core/comfy_client.py` `core/sdclient.py` | 封装 ComfyUI(`:8188`) 与 NeoForge WebUI(`:7860`) 的 HTTP API，把实测踩过的坑固化进去 |
-| 出图调度器 | `manhua.py` | 镜头表 → 批量出图 → 命名落盘 + manifest.json |
+| 出图调度器 | `manhua.py` | 场景清单 → 批量出图 → 命名落盘 + manifest.json |
 | 图形页面 | `ui/image_app.py` `ui/image_page.html` | ①创作 ②后期 ③模型 ④资产 四组；提示词助手（中⇄英 / 词库 / 补全 / 风格）；自动以 `--nowebui` 拉起 SD 后端 |
 | 提示词助手 | `core/i18n_tags.py` | 读本机 SD 扩展的 danbooru 中英词典 + 词组库；纯标准库，无 GPU 无网络也能跑 |
-| MCP 桥 | `bridge/` | 把本机 AIGC 能力（SD 出图 / ComfyUI / ffmpeg / Blender / 语音）暴露成 MCP 工具给 AI Agent |
+| MCP 桥 | `bridge/` | 把本机 AIGC 能力（SD 出图 / ComfyUI / 语音）暴露成 MCP 工具给 AI Agent |
 
 ---
 
@@ -104,10 +104,9 @@ node server.mjs   # 走 stdio JSON-RPC，由 MCP 客户端拉起
 ```
 
 工具一览：`image_generate` / `image_edit` / `image_upscale` / `image_process` / `comfy_generate` / `sd_models` / `sd_set_model` / `sd_start` / `aigc_status` / `tts_speak` / `voice_clone` / `gsv_start`（共 12 个）。
-视频/Blender 四个工具（`video_generate` / `video_probe` / `video_ffmpeg` / `blender_run`）已按主线要求**删除**（TOOLS 条目 + handler），工具面从 16 降到 12。
 
-**分线开关**（出图主线 / 视频支线）：`NEOFORGE_BRIDGE_LINE=image|video|all`，默认 `all`（向后兼容）。
-`image` 只暴露 9 个图像工具、`video` 只剩 4 个语音工具；调到线外工具会返回明确报错而不是静默失败。实测：image=9、video=4、all=12。
+**分线开关**（出图 / 语音）：`NEOFORGE_BRIDGE_LINE=image|voice|all`，默认 `all`（向后兼容）。
+`image` 只暴露 9 个图像工具、`voice` 只剩 4 个语音工具；调到线外工具会返回明确报错而不是静默失败。实测：image=9、voice=4、all=12。
 
 ---
 
@@ -123,12 +122,7 @@ node server.mjs   # 走 stdio JSON-RPC，由 MCP 客户端拉起
 
 小抄：页面里 `文生图 / 图生图` 两个页签；想直接落到图生图就开 `http://127.0.0.1:8899/?mode=i2i`。
 
-> **视频能力已归档（2026-10-19）**：木偶动作 / AnimateDiff / 轨迹驱动全部移到 `_parked/video/`，
-> 代码原样保留但**不参与启动、不进冒烟**。要恢复：`ui_console.py → ui/console.py`、
-> `core_video/ → core/video/`、`shim_motion|quality|traj.py → core/`、`traj_check.py → tests/`，
-> 再把 `启动NeoForgeSD-视频.cmd` 放回根目录即可。历史实测数据（8 模板全 COHERENT、轨迹驱动 12 事件）随文件一起保留。
-
-**生图（`ui/image_app.py` + `ui/image_page.html`，8899，零视频依赖）** —— 把 SD 里能通过 API 做的功能全搬过来，按 **4 组** 摆：
+**生图（`ui/image_app.py` + `ui/image_page.html`，8899，独立前端）** —— 把 SD 里能通过 API 做的功能全搬过来，按 **4 组** 摆：
 
 | 组 | 里面有什么 | 对应 SD |
 |---|---|---|
@@ -142,7 +136,7 @@ node server.mjs   # 走 stdio JSON-RPC，由 MCP 客户端拉起
 - 全量功能对照与「不做什么」见 `FEATURES-SD.md`
 
 **后端由谁管**：页面打开时若检测到后端没跑，会自动以 `--nowebui` 拉起（60–120 秒，顶栏显示「后端启动中 xx s」）；
-「停止后端」可释放显存。`--nowebui` 只是不生成 WebUI 页面，**扩展脚本照常加载**（实测 `/sdapi/v1/scripts` 里 `adetailer` / `animatediff` / `controlnet` 都在，ADetailer 走 `alwayson_scripts` 正常生效）。
+「停止后端」可释放显存。`--nowebui` 只是不生成 WebUI 页面，**扩展脚本照常加载**（实测 `/sdapi/v1/scripts` 里 `adetailer` / `controlnet` 都在，ADetailer 走 `alwayson_scripts` 正常生效）。
 
 **默认参数 = 老 SD WebUI 的基线**（对着 `ui-config.json` / `config.json` 核过）：`512×512` · 20 步 · `DPM++ 2M` + `karras` · CFG 7 · CLIP skip 2 · VAE `vae-ft-mse-840000-ema-pruned` · Hires off。
 SD1.5 在 768² 以上容易被拉长/崩肢体 —— 想出大图请用「放大」或「高清修复」，别直接拉分辨率。
@@ -172,7 +166,7 @@ SD1.5 在 768² 以上容易被拉长/崩肢体 —— 想出大图请用「放�
 python tests/smoke.py     # 全仓 py 编译 + node --check bridge + 起控制台走完整 HTTP 链路
 ```
 
-不需要 SD 后端、不需要显卡、不需要视频依赖：`/api/status`（离线但字段完整）→ 首页三区块（文生图 / 重绘 / 放大 + LoRA/高清修复）→ `/api/history` → 无后端时 `/api/image`、`/api/img2img`、`/api/upscale`、`/api/model` 都要 503 → 未知 job 要 404 → 页面里不能残留 `puppet`/`/api/motion`。约 15 秒跑完，结果写 `smoke.json`（`NEOFORGE_TEST_OUT` 可指定目录）。
+不需要 SD 后端、不需要显卡：`/api/status`（离线但字段完整）→ 首页三区块（文生图 / 重绘 / 放大 + LoRA/高清修复）→ `/api/history` → 无后端时 `/api/image`、`/api/img2img`、`/api/upscale`、`/api/model` 都要 503 → 未知 job 要 404。约 15 秒跑完，结果写 `smoke.json`（`NEOFORGE_TEST_OUT` 可指定目录）。
 
 > 冒烟会把自己的 `NEOFORGE_SD_API` 指向关闭端口（默认 `http://127.0.0.1:9`），所以**本机 SD 正在跑也能跑冒烟**；要连真后端测，用 `NEOFORGE_TEST_SD_API=http://127.0.0.1:7860`。
 
@@ -220,14 +214,13 @@ D:\AIGC\comfyui\venv\Scripts\python.exe tools/checkpoint_split_fp8.py <checkpoin
 
 ```
 manhua.py            # 出图调度器（图像主线 CLI）
-ui/image_app.py      # 生图前端（8899，零视频依赖；SD 后端由它无界面拉起）
+ui/image_app.py      # 生图前端（8899；SD 后端由它无界面拉起）
 core/image/          # comfy_client + sdclient —— 出图主线（ComfyUI / NeoForge WebUI 客户端）
 core/*.py            # 同名兼容 shim：旧 import 照旧可用
 bridge/              # MCP 桥（node，含 py/ 辅助脚本；支持 NEOFORGE_BRIDGE_LINE 分线）
 tests/               # 自检：smoke.py（生图线端到端冒烟）
 tools/               # 模型下载 / checkpoint 拆分(fp8) / ComfyUI 自检等小工具
 workflows/           # 现成工作流模板（SDXL 竖屏 fp8 等）
-Parked: _parked/video/   # 视频能力归档（木偶 / AnimateDiff / 轨迹驱动，不参与启动）
 spike/               # 实测/基准脚本（选型依据留痕）
 ```
 

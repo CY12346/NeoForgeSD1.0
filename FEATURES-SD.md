@@ -11,8 +11,7 @@
 | `img2img` | 908 | 图生图 / 局部重绘(inpaint) / 批量 |
 | `extras` | 53 | 放大、批量放大、面部修复(GFPGAN/CodeFormer) |
 | `pnginfo` | 4 | 从 PNG 读参数 |
-| `customscript` | 1565 | 各种脚本（ADetailer / ControlNet / AnimateDiff / Dynamic Thresholding / LoRA Block Weight / Refiner / Reactor / Tiled Diffusion…） |
-| `deforum_interface` | 477 | Deforum 视频 |
+| `customscript` | 1565 | 各种脚本（ADetailer / ControlNet / Dynamic Thresholding / LoRA Block Weight / Refiner / Reactor / Tiled Diffusion…） |
 | `supermerger` | 445 | LoRA/权重合并 |
 | `EasyPhoto_tabs` | 367 | 数字人 |
 | `inpaint_anything` | 130 | SAM 涂抹重绘 |
@@ -43,7 +42,7 @@
 | 反推提示词（Tagger / CLIP interrogate） | `POST /sdapi/v1/interrogate`（`interrogate` 模型需本机有） | ⚠️ 未验证 | **资产（二期）** |
 | ControlNet | `/controlnet/*` | ⚠️ 可做，但每张图要配 unit + 预处理器，工作量大 | 二期 |
 | XY 图表 / Prompt matrix | 脚本 | ❌ 不做（低频，UI 成本高） | — |
-| Deforum / AnimateDiff / EasyPhoto | — | ❌ 不做（视频线已归档） | — |
+| Deforum / EasyPhoto | — | ❌ 不做 | — |
 | 训练 / 合并模型 / 转换 / 拆分 | 无对应 API | ❌ 不做（留在 SD / 工具脚本） | — |
 | 插件管理 / 设置全量 | 部分 `options` | ❌ 不做（危险且低频） | — |
 

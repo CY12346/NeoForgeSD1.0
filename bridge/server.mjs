@@ -3,9 +3,7 @@
  * aigc-bridge — Local MCP server.
  *
  * Bridges THIS machine's AIGC software into Hermes as first-class MCP tools:
- *   - Stable Diffusion WebUI (API on :7860)  -> image gen/edit/upscale, AnimateDiff video gen
- *   - ffmpeg/ffprobe (bundled with LosslessCut) -> video/audio processing
- *   - Blender (CLI)                          -> 3D render / procedural output
+ *   - Stable Diffusion WebUI (API on :7860)  -> image gen/edit/upscale
  *   - Pillow (python)                        -> offline image batch processing
  *   - edge-tts / GPT-SoVITS (:9880)          -> speech synthesis & voice cloning
  *
@@ -45,9 +43,6 @@ const CFG = {
   //   xformers 0.0.25.post1+cu118 现已装好，启动日志会打印
   //   "xformers version: 0.0.25.post1+cu118"，自动生效。
   sdArgs: (process.env.SD_ARGS || "--api --skip-install").split(" ").filter(Boolean),
-  ffmpeg: process.env.FFMPEG_BIN || "E:\\LosslessCut\\resources\\ffmpeg.exe",
-  ffprobe: process.env.FFPROBE_BIN || "E:\\LosslessCut\\resources\\ffprobe.exe",
-  blender: process.env.BLENDER_BIN || "D:\\Blender\\blender.exe",
   python: process.env.PYTHON_BIN || "E:\\python\\python.exe",
   gsvUrl: process.env.GSV_URL || "http://127.0.0.1:9880",
   // GSV-TTS-Lite: a GPT-SoVITS inference engine (same /tts v2 API shape, port 9880).
@@ -117,7 +112,7 @@ function run(cmd, args, { timeoutMs = 600000, cwd } = {}) {
  *
  * Deliberately uses node:http rather than global fetch: undici enforces a
  * 5-minute headers timeout that an AbortSignal cannot extend, and a single
- * AnimateDiff / high-step generation easily runs longer than that.
+ * high-step / high-resolution generation easily runs longer than that.
  */
 function httpJson(url, { method = "GET", body, timeoutMs = 0 } = {}) {
   return new Promise((resolve, reject) => {
@@ -260,115 +255,16 @@ async function writeB64(b64, dest) {
 }
 
 /**
- * Sniff a base64 payload's real container from its magic bytes.
- * AnimateDiff returns several formats in one list, in code order rather than
- * the order we asked for, so classify instead of trusting position.
+ * Sniff a base64 image payload's real container from its magic bytes.
+ * SD returns images in code order rather than the order we asked for,
+ * so classify instead of trusting position.
  */
 function sniffB64(b64) {
   const head = b64.slice(0, 24);
   if (head.startsWith("R0lGOD")) return { ext: "gif", mime: "image/gif" };          // GIF8
   if (head.startsWith("iVBORw0")) return { ext: "png", mime: "image/png" };         // PNG
   if (head.startsWith("UklGR")) return { ext: "webp", mime: "image/webp" };         // RIFF/WEBP
-  if (head.startsWith("GkXfow")) return { ext: "webm", mime: "video/webm" };        // EBML
-  if (head.startsWith("AAAA") || /^[A-Za-z0-9+/]{4}(.{8})/.test(head)) {
-    const probe = Buffer.from(b64.slice(0, 64), "base64").toString("latin1");
-    if (probe.includes("ftyp")) return { ext: "mp4", mime: "video/mp4" };
-  }
   return { ext: "bin", mime: "application/octet-stream" };
-}
-
-/* ------------------------------------------------------------------ *
- * ffmpeg argument builders (named ops — predictable, no shell)
- * ------------------------------------------------------------------ */
-function ffArgs(op, a = {}) {
-  const vargs = a.videoArgs || ["-c:v", "libx264", "-preset", a.preset || "medium", "-crf", String(a.crf ?? 20)];
-  const aargs = a.audioArgs || ["-c:a", "aac", "-b:a", a.audioBitrate || "192k"];
-  switch (op) {
-    case "cut": {
-      const pre = [];
-      if (a.fast !== false && a.reencode !== true) pre.push("-ss", String(a.start ?? 0));
-      const out = [...pre];
-      if (a.reencode === true || a.fast === false) {
-        out.push("-i", a.input, "-ss", String(a.start ?? 0));
-        if (a.end != null) out.push("-to", String(a.end));
-        out.push(...vargs, ...aargs);
-      } else {
-        out.push("-i", a.input, "-t", String((a.end ?? 0) - (a.start ?? 0)), "-c", "copy");
-      }
-      return [...out, "-y", a.output];
-    }
-    case "concat":
-      return ["-f", "concat", "-safe", "0", "-i", a.listFile, "-c", "copy", "-y", a.output];
-    case "convert":
-      return ["-i", a.input, ...(a.args || ["-c:v", "libx264", "-crf", "20", "-c:a", "aac"]), "-y", a.output];
-    case "compress": {
-      const crf = String(a.crf ?? 26);
-      const extra = [];
-      if (a.maxWidth) extra.push("-vf", `scale='min(${a.maxWidth},iw)':-2`);
-      return ["-i", a.input, "-c:v", "libx264", "-preset", a.preset || "slow", "-crf", crf,
-        "-c:a", "aac", "-b:a", a.audioBitrate || "128k", ...extra, "-movflags", "+faststart", "-y", a.output];
-    }
-    case "gif": {
-      const fps = a.fps ?? 12;
-      const w = Math.min(a.width ?? 480, 640);
-      // Cap duration: an uncapped GIF of a long clip balloons to tens of MB.
-      const dur = a.duration ?? 10;
-      return [
-        "-t", String(dur),
-        "-i", a.input,
-        "-vf", `fps=${fps},scale=${w}:-1:flags=lanczos,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse`,
-        "-loop", String(a.loop ?? 0), "-y", a.output,
-      ];
-    }
-    case "frames": {
-      let out = a.output;
-      if (!String(out).includes("%")) {
-        const e = path.extname(out);
-        out = out.slice(0, out.length - e.length) + "_%04d" + e;
-      }
-      const base = ["-i", a.input];
-      if (a.time != null) base.unshift("-ss", String(a.time));
-      if (a.fps) base.push("-vf", `fps=${a.fps}`);
-      return [...base, ...(a.time != null ? ["-frames:v", "1"] : []), "-y", out];
-    }
-    case "audio":
-      return ["-i", a.input, "-vn", ...(a.args || ["-c:a", "libmp3lame", "-q:a", "2"]), "-y", a.output];
-    case "mute":
-      return ["-i", a.input, "-c", "copy", "-an", "-y", a.output];
-    case "replace_audio":
-      return ["-i", a.input, "-i", a.audio, "-map", "0:v:0", "-map", "1:a:0",
-        "-c:v", "copy", "-c:a", "aac", "-shortest", "-y", a.output];
-    case "speed": {
-      const s = a.speed ?? 1;
-      return ["-i", a.input,
-        "-filter_complex",
-        `[0:v]setpts=${(1 / s).toFixed(6)}*PTS[v];[0:a]atempo=${s}[a]`,
-        "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-crf", "20", "-c:a", "aac", "-y", a.output];
-    }
-    case "resize":
-      return ["-i", a.input, "-vf", `scale=${a.width ?? -2}:${a.height ?? 1080}`, ...vargs, ...aargs, "-y", a.output];
-    case "thumbnail":
-      return ["-ss", String(a.time ?? 0), "-i", a.input, "-frames:v", "1",
-        ...(a.width ? ["-vf", `scale=${a.width}:-2`] : []), "-y", a.output];
-    case "normalize":
-      return ["-i", a.input, "-af", "loudnorm=I=-16:TP=-1.5:LRA=11", "-c:v", "copy", "-y", a.output];
-    case "watermark": {
-      const pos = a.position || "bottomright";
-      return ["-i", a.input, "-i", a.image, "-filter_complex",
-        `[1:v]scale=${a.wmWidth ?? 160}:-1[wm];[0:v][wm]overlay=${a.x ?? "W-w-24"}:${a.y ?? "H-h-24"}[v]`,
-        "-map", "[v]", "-map", "0:a?", ...vargs, ...aargs, "-y", a.output];
-    }
-    case "subtitles":
-      return ["-i", a.input, "-vf",
-        `subtitles='${String(a.subs).replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'")}'`,
-        ...vargs, ...aargs, "-y", a.output];
-    case "burn_srt_hardsub":
-      return ["-i", a.input, "-vf", `ass='${a.subs}'`, ...vargs, ...aargs, "-y", a.output];
-    case "custom":
-      return [...(a.args || []), "-y", a.output];
-    default:
-      throw new Error(`unknown ffmpeg op: ${op}`);
-  }
 }
 
 /* ------------------------------------------------------------------ *
@@ -378,7 +274,7 @@ const TOOLS = [
   {
     name: "aigc_status",
     description:
-      "Health check of the whole local AIGC stack: Stable Diffusion WebUI (API :7860), ffmpeg/ffprobe, Blender, Python/Pillow, edge-tts, GPT-SoVITS (:9880). Run this first when something fails.",
+      "Health check of the local AIGC stack: Stable Diffusion WebUI (API :7860), Python/Pillow, edge-tts, GPT-SoVITS (:9880). Run this first when something fails.",
     inputSchema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
@@ -504,7 +400,7 @@ const TOOLS = [
   {
     name: "tts_speak",
     description:
-      "Text-to-speech to an MP3 file. Uses edge-tts (free, offline-installable, many Chinese voices) or GPT-SoVITS when engine='gptsovits'. For video voice-over.",
+      "Text-to-speech to an MP3 file. Uses edge-tts (free, offline-installable, many Chinese voices) or GPT-SoVITS when engine='gptsovits'.",
     inputSchema: {
       type: "object",
       properties: {
@@ -591,14 +487,6 @@ const handlers = {
     const sd = await sdAlive();
     lines.push(`Stable Diffusion WebUI (${CFG.sdUrl}): ${sd ? "READY" : "not running"}`);
 
-    const ff = await run(CFG.ffmpeg, ["-version"], { timeoutMs: 15000 });
-    lines.push(`ffmpeg: ${ff.code === 0 ? ff.stdout.split("\n")[0].trim() : "MISSING at " + CFG.ffmpeg}`);
-    const fp = await run(CFG.ffprobe, ["-version"], { timeoutMs: 15000 });
-    lines.push(`ffprobe: ${fp.code === 0 ? "ok" : "MISSING at " + CFG.ffprobe}`);
-
-    const bl = await run(CFG.blender, ["--version"], { timeoutMs: 30000 });
-    lines.push(`Blender: ${bl.code === 0 ? (bl.stdout.split("\n")[0] || "").trim() : "MISSING at " + CFG.blender}`);
-
     const py = await run(CFG.python, ["-c", "import PIL,sys;print('Pillow',PIL.__version__,'py',sys.version.split()[0])"], { timeoutMs: 30000 });
     lines.push(`Python/Pillow: ${py.code === 0 ? py.stdout.trim() : "MISSING — " + py.stderr.trim().slice(0, 200)}`);
 
@@ -611,7 +499,6 @@ const handlers = {
       gsv = "reachable";
     } catch {}
     lines.push(`GPT-SoVITS (${CFG.gsvUrl}): ${gsv}`);
-    lines.push(`ffmpeg path: ${CFG.ffmpeg}`);
     lines.push(`Output root: ${CFG.outRoot}`);
     return lines.join("\n");
   },
@@ -1006,9 +893,9 @@ asyncio.run(main())
 };
 
 /* ------------------------------------------------------------------ *
- * 分线开关（出图=主线，视频=支线）
+ * 分线开关（出图 / 语音）
  *   NEOFORGE_BRIDGE_LINE=image  只暴露图像链路工具
- *   NEOFORGE_BRIDGE_LINE=video  只暴露视频 / Blender / 语音工具
+ *   NEOFORGE_BRIDGE_LINE=voice  只暴露语音工具
  *   不设或 all             → 全部（默认，向后兼容）
  * 只影响 tools/list；handlers 本身不删，脚本直调不受影响。
  * ------------------------------------------------------------------ */
@@ -1018,7 +905,7 @@ const LINE_SETS = {
     "aigc_status", "sd_start", "sd_models", "sd_set_model",
     "image_generate", "image_edit", "image_upscale", "image_process", "comfy_generate",
   ]),
-  video: new Set([
+  voice: new Set([
     "aigc_status",
     "tts_speak", "voice_clone", "gsv_start",
   ]),
