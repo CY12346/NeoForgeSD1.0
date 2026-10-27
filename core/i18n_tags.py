@@ -25,7 +25,9 @@ import time
 import urllib.parse
 import urllib.request
 
-SD_HOME = os.environ.get("NEOFORGE_SD_HOME", r"E:/NeoForge/backend")
+_APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SD_HOME = os.path.abspath(os.environ.get("NEOFORGE_SD_HOME")
+                          or os.path.join(_APP_ROOT, os.pardir, "backend"))
 TAG_DIR = os.path.join(SD_HOME, "extensions", "a1111-sd-webui-tagcomplete", "tags")
 ZH_CSV = os.path.join(TAG_DIR, "danbooru.zh_CN_SFW.csv")
 EN_CSV = os.path.join(TAG_DIR, "danbooru.csv")

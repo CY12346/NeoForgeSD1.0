@@ -11,6 +11,7 @@
 """
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -21,7 +22,7 @@ import webbrowser
 from tkinter import messagebox, scrolledtext, ttk
 
 APP_NAME = "NeoForgeSD"
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 PORT = 8899
 
 # exe 所在目录（PyInstaller onefile 解包到临时目录，所以用 exe 的真实路径）
@@ -49,6 +50,37 @@ def first_model():
             if f.lower().endswith((".safetensors", ".ckpt")):
                 return os.path.join(dirpath, f)
     return None
+
+
+def ensure_models_link():
+    """A1111 只认 backend/models；便携布局里模型放在同级 models/，首次运行时建目录联接。
+
+    坑：A1111 自己在没有 models 时会建空壳目录（只有 Codeformer/GFPGAN 这些子目录），
+    必须先识别出「空壳」再换成联接，否则模型永远不可见。
+    """
+    link = os.path.join(BACKEND, "models")
+    if os.path.isdir(link):
+        try:
+            if set(os.listdir(link)) == set(os.listdir(MODELS)):
+                return True                     # 已是联接或内容一致
+        except OSError:
+            return True
+        try:
+            os.rmdir(link)                      # 只删空目录；有内容就放弃，避免破坏
+        except OSError:
+            shutil.rmtree(link, ignore_errors=True)
+            if os.path.isdir(link):
+                return True
+    if not os.path.isdir(MODELS):
+        return False
+    try:
+        subprocess.run(["cmd", "/c", "mklink", "/J",
+                        os.path.normpath(link), os.path.normpath(MODELS)],
+                       capture_output=True, timeout=30,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except Exception:
+        return False
+    return os.path.exists(link)
 
 
 def api_status(timeout=3):
@@ -183,6 +215,15 @@ class Launcher(tk.Tk):
         if not os.path.isfile(FRONTEND):
             messagebox.showerror(APP_NAME, f"找不到前端：\n{FRONTEND}")
             return
+        if not ensure_models_link():
+            self.logline("⚠ 模型目录未连接（backend/models），请确认 models/ 与启动器同级")
+        elif not os.path.exists(os.path.join(WORK, "models_linked.flag")):
+            self.logline("模型目录已连接：backend/models → models")
+            try:
+                os.makedirs(WORK, exist_ok=True)
+                open(os.path.join(WORK, "models_linked.flag"), "w").close()
+            except Exception:
+                pass
         if port_open():
             self.logline("服务已在运行，直接打开页面")
             self.on_open()
@@ -194,7 +235,8 @@ class Launcher(tk.Tk):
         threading.Thread(target=self._boot, daemon=True).start()
 
     def _boot(self):
-        env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8", NEOFORGE_IMAGE_PORT=str(PORT))
+        env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8", NEOFORGE_IMAGE_PORT=str(PORT),
+                   NEOFORGE_SD_HOME=str(BACKEND), NEOFORGE_IMAGE_WORK=str(WORK))
         creation = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         try:
             self.proc = subprocess.Popen(

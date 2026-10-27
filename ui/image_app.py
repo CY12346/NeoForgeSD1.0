@@ -42,9 +42,12 @@ except Exception as _e:                 # 词典坏了也不该拖垮出图
 
 PORT = int(os.environ.get("NEOFORGE_IMAGE_PORT", os.environ.get("NEOFORGE_CONSOLE_PORT", "8899")))
 SD_API = os.environ.get("NEOFORGE_SD_API", "http://127.0.0.1:7860").rstrip("/")
-SD_HOME = os.environ.get("NEOFORGE_SD_HOME", r"E:/NeoForge/backend")
+SD_HOME = os.path.abspath(os.environ.get("NEOFORGE_SD_HOME")
+                          or os.path.join(ROOT, os.pardir, "backend"))
 SD_PY = os.path.join(SD_HOME, "python", "python.exe")
-WORK = os.environ.get("NEOFORGE_IMAGE_WORK", os.environ.get("NEOFORGE_WORK", r"D:/aicg/_neoforge_console"))
+WORK = os.path.abspath(os.environ.get("NEOFORGE_IMAGE_WORK")
+                       or os.environ.get("NEOFORGE_WORK")
+                       or os.path.join(ROOT, os.pardir, "work"))
 os.makedirs(WORK, exist_ok=True)
 HISTORY_FILE = os.path.join(WORK, "history_image.json")
 

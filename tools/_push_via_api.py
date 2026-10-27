@@ -95,10 +95,14 @@ api("PATCH", "/repos/%s/%s/git/refs/heads/main" % (OWNER, REPO),
     {"sha": commit["sha"], "force": False})
 print("main 已更新")
 
+TAG = "v1.2.1"
+for i, a in enumerate(sys.argv):
+    if a == "--tag" and i + 1 < len(sys.argv):
+        TAG = sys.argv[i + 1]
 try:
     api("POST", "/repos/%s/%s/git/refs" % (OWNER, REPO),
-        {"ref": "refs/tags/v1.1.0", "sha": commit["sha"]})
-    print("tag v1.1.0 已创建")
+        {"ref": "refs/tags/%s" % TAG, "sha": commit["sha"]})
+    print("tag %s 已创建" % TAG)
 except SystemExit as e:
     print("tag:", e)
 
