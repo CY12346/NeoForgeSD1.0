@@ -22,7 +22,7 @@ import webbrowser
 from tkinter import messagebox, scrolledtext, ttk
 
 APP_NAME = "NeoForgeSD"
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 PORT = 8899
 
 # exe 所在目录（PyInstaller onefile 解包到临时目录，所以用 exe 的真实路径）

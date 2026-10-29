@@ -90,8 +90,22 @@ START_LOCK = threading.Lock()
 #   · 默认不开 --no-half-vae：它让 VAE 常驻显存从 2375MB 涨到 3007MB，1024² 因此从 38.6s 拖到 64s。
 #     且本机 vae-ft-mse 在 fp16 下输出与 fp32 **逐像素一致**（max_diff=0.0），不存在黑图风险。
 # 显存比 4GB 更小可设 NEOFORGE_SD_MEDVRAM=1；遇到黑图/色偏可设 NEOFORGE_SAFE_VAE=1。
+#
+# SDXL 系模型必须配 SDXL VAE：沿用 SD1.5 的 vae-ft-mse 会出严重色偏/花屏
+# （2026-10-30 实测 Illustrious-XL + vae-ft-mse → 整张蓝紫斑驳，Laplacian 虚高到 843）。
+SDXL_VAE = os.environ.get("NEOFORGE_SDXL_VAE", "madebyollin-sdxl-vae-fp16-fix.safetensors")
+SDXL_HINTS = ("sdxl", "sd_xl", "illustrious", "pony", "noob", "xl-v", "-xl")
+
+
+def vae_for(model_name):
+    """按模型名推断该配哪个 VAE；返回 None 表示保持当前设置。"""
+    n = (model_name or "").lower()
+    return SDXL_VAE if any(h in n for h in SDXL_HINTS) else None
+
 SD_ARGS = ["--api", "--nowebui", "--port", "7860",
-           "--xformers", "--skip-version-check"]
+           "--xformers", "--skip-version-check", "--skip-install"]
+if os.environ.get("NEOFORGE_INSTALL_REQS") == "1":
+    SD_ARGS.remove("--skip-install")
 if os.environ.get("NEOFORGE_SD_MEDVRAM") == "1":
     SD_ARGS.insert(4, "--medvram")
 if os.environ.get("NEOFORGE_SAFE_VAE") == "1":
@@ -643,9 +657,15 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(400, {"error": "缺少 name"})
                 return
             try:
-                sd_post("/sdapi/v1/options", {"sd_model_checkpoint": name}, timeout=600)
+                opts = {"sd_model_checkpoint": name}
+                v = vae_for(name)
+                if v:
+                    opts["sd_vae"] = v          # SDXL 系自动换配套 VAE，否则花屏
+                sd_post("/sdapi/v1/options", opts, timeout=600)
                 _MODEL_CACHE.update(t=0, data=None)
-                self._json(200, {"ok": True, "model": sd_get("/sdapi/v1/options", 20).get("sd_model_checkpoint")})
+                o = sd_get("/sdapi/v1/options", 20)
+                self._json(200, {"ok": True, "model": o.get("sd_model_checkpoint"),
+                                 "vae": o.get("sd_vae")})
             except Exception as e:
                 self._json(500, {"error": f"{type(e).__name__}: {str(e)[:300]}"})
             return

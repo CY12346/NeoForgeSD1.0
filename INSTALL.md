@@ -1,4 +1,4 @@
-# NeoForgeSD 1.2.1 可分发包安装说明
+# NeoForgeSD 1.2.2 可分发包安装说明
 
 从 Release 下载四件套，解压即用：**不需要装 Python、不需要 pip、不需要 CUDA 工具链**。
 

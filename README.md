@@ -1,9 +1,27 @@
 注意：本项目是作者用于学习vibe coding的产物，作者本人的编程技术完全无法做到当前效果。
 
-# NeoForgeSD 1.2.0
+# NeoForgeSD 1.2.2
 
 本地 Stable Diffusion **出图编排层**：双后端客户端 + 批量出图调度器 + MCP 桥。
 
+> **v1.2.2（2026-10-30）｜SDXL 可用化：画质跨代 + 两处阻塞修复**
+>
+> 本机 4 GB 卡实测（同 prompt、同 seed 20261030、DPM++ 2M Karras）：
+>
+> | 档位 | 模型 | 最终分辨率 | 耗时 | 锐度（Laplacian） | 判定 |
+> |---|---|---|---|---|---|
+> | SD1.5 基线 | AWPainting v1.2 + 高清修复 2× | 1024×1536 | 91.3 s | 325 | 偏软 |
+> | SD1.5 基线 | ReVAnimated v122 + 高清修复 2× | 1024×1536 | 90.2 s | 327 | 偏软 |
+> | **SDXL** | **Illustrious-XL v0.1 直出** | **832×1216** | **440 s** | **908** | **锐利** |
+>
+> 锐度 **2.8 倍**；细节密度、构图完成度、光影层次全面超过 SD1.5（同一 seed 下 SD1.5 只出半身特写，SDXL 出完整场景）。
+>
+> **两处修复：**
+> 1. **SDXL 自动配套 VAE**（`vae_for()`，`ui/image_app.py`）——以前切到 SDXL 模型时仍沿用 SD1.5 的 `vae-ft-mse`，出图整张蓝紫斑驳花屏，而 Laplacian 反而虚高到 843 骗过糊图检测。现在按模型名自动切 `madebyollin-sdxl-vae-fp16-fix`，接口还会回传实际生效的 VAE。
+> 2. **后端启动加 `--skip-install`** —— A1111 每次启动重装依赖会把 `ml_dtypes` 降到 0.4.1，`transformers` 随即报 `module 'ml_dtypes' has no attribute 'float8_e3m4'` 直接起不来（本次实测复现 2 次）。现在默认跳过依赖安装；要重建依赖时设 `NEOFORGE_INSTALL_REQS=1`。
+>
+> **速度代价说清楚**：4 GB 卡跑 SDXL 20 步 = **7.3 分钟/张**（显存打满，每步 ~20 s）。试过 Lightning 6 步（4.5 分钟）但 blur 仅 178，属于糊图，不推荐。**结论：4 GB 上 SDXL 只用于精修单张，批量出图仍走 SD1.5。**
+>
 > **v1.2.0（2026-10-19）｜图形启动器：双击即用，告别黑框**
 >
 > 新增 **`NeoForgeSD.exe`**（12 MB，Release 附件 + 仓库 `dist/`）作为唯一入口：
