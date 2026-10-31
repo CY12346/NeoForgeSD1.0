@@ -17,6 +17,7 @@ _smoke
 
 # PyInstaller 中间产物
 build/
+dist/
 __pycache__/
 *.pyc
 work/

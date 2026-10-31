@@ -1,0 +1,22 @@
+{
+  "spec": 1,
+  "id": "fake",
+  "name": "假内核（管道自测，不出图）",
+  "version": "0.1.0",
+  "dialect": "custom",
+  "command": ["{python}", "{kernel}/fake_kernel.py", "{port}"],
+  "cwd": "{kernel}",
+  "args": [],
+  "env": {},
+  "port": 18899,
+  "health": {
+    "path": "/healthz",
+    "interval_s": 0.5,
+    "timeout_s": 1.0,
+    "fail_threshold": 3
+  },
+  "ready": {"mode": "both"},
+  "progress": {"pattern": "PIPE:PROGRESS ([0-9.]+)\\s*(.*)"},
+  "needs": {},
+  "stop": {"grace_s": 3}
+}

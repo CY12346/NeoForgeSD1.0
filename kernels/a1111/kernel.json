@@ -1,0 +1,29 @@
+{
+  "spec": 1,
+  "id": "a1111",
+  "name": "A1111 · NeoForgeSD 前端",
+  "version": "1.2.2",
+  "dialect": "neoforge",
+  "command": ["{python}", "ui/image_app.py"],
+  "cwd": "{base}",
+  "args": [],
+  "env": {
+    "PYTHONUTF8": "1",
+    "PYTHONIOENCODING": "utf-8",
+    "NEOFORGE_IMAGE_PORT": "{port}",
+    "NEOFORGE_SD_HOME": "{base}/backend",
+    "NEOFORGE_IMAGE_WORK": "{base}/work"
+  },
+  "port": 8899,
+  "health": {
+    "path": "/api/status",
+    "interval_s": 2.0,
+    "timeout_s": 3.0,
+    "fail_threshold": 3
+  },
+  "ready": {"mode": "poll"},
+  "progress": {"pattern": "PIPE:PROGRESS ([0-9.]+)\\s*(.*)"},
+  "needs": {"models": ["Stable-diffusion"], "vram_gb": 4},
+  "stop": {"grace_s": 8},
+  "notes": "真正的重活在它内部：image_app.py 自己会拉起 SD 后端。这里只管把它当内核起停。"
+}

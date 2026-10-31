@@ -1,49 +1,61 @@
-# NeoForgeSD 1.2.2 可分发包安装说明
+# NeoForgeSD 1.3.0 安装说明
 
-从 Release 下载四件套，解压即用：**不需要装 Python、不需要 pip、不需要 CUDA 工具链**。
+1.3.0 起**壳不含后端**：启动器只有几 MB，内核（生图后端）单独装、随时换。
 
-## 一、下载
+## 一、三样东西
 
-| 顺序 | 文件 | 说明 |
+| 东西 | 是什么 | 多大 |
 |---|---|---|
-| 1 | `NeoForgeSD.exe` | 图形启动器 |
-| 2 | `NeoForgeSD-app-1.2.1.zip` | 前端与业务代码 → 解出 `app/` |
-| 3 | `NeoForge-backend-1.2.1.7z.001` … `.00N` | 后端运行体分卷，**必须全部下完** |
-| 4 | 底模 `.safetensors` | 如 Release v1.2.0 的 `AWPainting_v1.2.safetensors` |
+| `NeoForgeSD.exe` | 壳：状态灯、内核列表、起停、日志 | < 10 MB |
+| 内核目录（如 `backend/`） | 真正出图的后端，自带 python | 1–2 GB |
+| `models/` | 底模与放大/修脸权重 | 按需 |
 
-## 二、目录结构（解压后必须长这样）
+## 二、目录结构
 
 ```
 NeoForgeSD\
   NeoForgeSD.exe
-  app\          ← 第 2 项解压得到
-  backend\      ← 第 3 项从 .7z.001 解压得到（自带 python）
-  models\       ← 分卷里已带 VAE / CodeFormer / GFPGAN / ESRGAN / RealESRGAN
+  kernels\           ← 内核登记册，每个子目录一份 kernel.json
+    a1111\
+      kernel.json
+    fake\
+      kernel.json
+      fake_kernel.py
+  backend\           ← 内核一：A1111 运行体（自带 python）
+  app\               ← 前端与业务代码（被 a1111 内核使用）
+  models\
     Stable-diffusion\   ← 底模放这里
-  work\         ← 首次启动自动生成
+  work\              ← 运行产物与日志
 ```
 
-## 三、步骤
+## 三、跑起来
 
-1. 分卷放同一文件夹 → 右键 `.7z.001` → 7-Zip → 解压到当前文件夹 → 得到 `backend/`
-2. `app/`、`NeoForgeSD.exe`、`backend/`、`models/` 放在同一层
-3. 底模放进 `models\Stable-diffusion\`
-4. 双击 `NeoForgeSD.exe` → 「启动」→ 浏览器打开 http://127.0.0.1:8899/
+1. 双击 `NeoForgeSD.exe` → 壳自己跑环境侦探，六个状态灯直接告诉你「缺什么、怎么补」
+2. 下拉框选内核（`a1111` 或 `fake`），点「启动」
+3. 就绪后自动打开 http://127.0.0.1:8899/
 
-启动器首次运行会自动建立 `backend\models` → `models` 的目录联接（A1111 只认 `backend/models`）。
-若被拦下，手动执行：`mklink /J backend\models models`
+**第一次只想验证壳能不能用**：选 `fake` 内核 —— 它不出图，只证明管道（起 · 判活 · 进度 · 收尸）是通的。
 
-## 四、包里有什么
+## 四、加一个新内核
 
-- Python 3.10.11 + torch 2.1 (CUDA 11.8) + 稳定扩散 WebUI 1.10.1，以 `--nowebui` 只跑 API 后端
-- 扩展：ADetailer、a1111-sd-webui-tagcomplete（8.6 万中文 tag）、prompt-all-in-one、简体中文语言包
-- 离线权重：CodeFormer、GFPGAN、vae-ft-mse-840000、`4x-AnimeSharp` / `RealESRGAN_x4plus`、
-  HuggingFace 缓存（ADetailer 人脸检测）
-- 为缩小体积删除了 `*.lib`（C++ 链接期文件，运行时从不加载，省 742 MB）
+1. 建目录 `kernels\<名字>\`
+2. 写 `kernel.json`（字段见 [`SPEC-kernel.md`](SPEC-kernel.md)），至少给 `spec / id / name / command / port`
+3. 重启壳 → 下拉框里就多一项
+
+内核要配合管道，只需在 stdout 上打一行 `PIPE:READY port=<端口>`，并提供 manifest 里声明的健康检查路径。
+不想改内核也行：`ready.mode` 写 `poll`，壳直接轮询健康检查。
 
 ## 五、常见问题
 
-- **「找不到 SD 后端」**：`backend/` 没和解压位置对齐，或分卷没下全。
-- **「未找到 .safetensors」**：`models\Stable-diffusion\` 是空的，第 3 步没做。
-- **首次启动慢**：加载模型 60–120 秒属正常，日志在 `work\sd_server.log`。
-- **显存**：4 GB 可跑 512²（约 6 秒）与 1024²（约 38 秒）；不要额外加 `--no-half-vae`（会拖慢一倍）。
+- **状态灯：后端 Python 红** —— `backend/` 没和 exe 放同一层；A1111 内核需要它自带的 python。
+- **状态灯：基础模型红** —— `models\Stable-diffusion\` 是空的。
+- **状态灯：端口黄** —— 8899 被占用：要么它就是在跑（直接开页面），要么改该内核 `kernel.json` 的 `port`。
+- **「起不来」** —— 日志窗最后一屏会写具体原因（命令不存在 / 工作目录不对 / 等就绪超时）。
+- **停止后要干净** —— 壳会先温和终止、再强杀整棵进程树，最后验证端口释放；不留孤儿是硬要求。
+- **显存** —— 4 GB 可跑 512²（约 6 秒）与 1024²（约 38 秒）；不要加 `--no-half-vae`（会拖慢一倍）。
+
+## 六、从 1.2.x 升上来
+
+1.2.x 是整合包（5.55 GiB，含 backend 与 models）。升级时**不用重下**：
+把旧的 `backend/`、`models/`、`app/` 挪到新 `NeoForgeSD.exe` 同级，再放上 `kernels/` 即可。
+旧 Release 仍可下载，但已标 legacy，不再引导新用户。
