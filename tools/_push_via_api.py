@@ -57,14 +57,20 @@ if not anc and remote != head:
 if remote == head:
     print("远端已是最新，跳过 commit")
 
-out = subprocess.run(["git", "ls-tree", "-r", "--full-tree", head],
-                     capture_output=True, text=True).stdout
+out = subprocess.run(["git", "ls-tree", "-r", "-z", "--full-tree", head],
+                     capture_output=True).stdout
 entries = []
-for ln in out.splitlines():
-    meta, path = ln.split("\t", 1)
-    mode, typ, sha = meta.split()
+for raw in out.split(b"\0"):
+    if not raw.strip():
+        continue
+    meta, path = raw.split(b"\t", 1)
+    mode, typ, sha = meta.decode().split()
+    p = path.decode("utf-8")
+    # 防回归：这条曾经用非 -z 的 ls-tree，被 git 的 C 风格引号转义污染过 3 个文件名
+    if '"' in p or "\\" in p:
+        sys.exit("路径里出现引号/反斜杠，疑似被 git 转义：%r（已中止，什么都没推）" % p)
     if typ == "blob":
-        entries.append((mode, path, sha))
+        entries.append((mode, p, sha))
 print("文件数:", len(entries))
 total = sum(len(subprocess.run(["git", "cat-file", "blob", s], capture_output=True).stdout)
             for _, _, s in entries)
