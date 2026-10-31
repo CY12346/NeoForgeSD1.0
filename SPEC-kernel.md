@@ -15,7 +15,7 @@
 
 ```
 NeoForgeSD/
-  NeoForgeSD.exe            # 壳（<10MB）
+  NeoForgeSD.exe            # 壳（11.5 MB，实测未压 UPX）
   kernels/
     fake/
       kernel.json
