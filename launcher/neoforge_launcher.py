@@ -24,7 +24,7 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
 APP_NAME = "NeoForgeSD"
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 LAUNCHER_VERSION = "0.3"            # 启动器自己的版本线（0.2→0.3：在线模型目录 + 双内核 + 热度榜）
 INSTALLER_LABEL = f"启动器 {LAUNCHER_VERSION}"
 
@@ -197,6 +197,8 @@ def discover_all():
     for root in kernel_roots():
         for m, err in kernel.discover(root, base_dir=BASE_DIR):
             if m:
+                if m.get("hidden"):      # 自测用的假内核之类：登记但不上界面
+                    continue
                 if m["id"] not in seen:
                     seen.add(m["id"])
                     out[m["id"]] = m
@@ -868,7 +870,10 @@ class Launcher(tk.Tk):
             self.lbl_kernel.configure(text="无内核")
             self.refresh_detect()
             return
-        self.lb.selection_set(0)
+        # 默认选主力内核：neoforge-sd15 是日常用的那条，别按名字排序把别的顶上去
+        want = "neoforge-sd15" if "neoforge-sd15" in self.ids else (self.ids[0] if self.ids else None)
+        if want:
+            self.lb.selection_set(self.ids.index(want))
         self.logline(f"内核登记册：{len(self.ids)} 个（{', '.join(self.ids)}）")
         self.refresh_detail()
         self.refresh_detect()

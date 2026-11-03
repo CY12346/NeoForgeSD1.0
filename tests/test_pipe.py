@@ -33,7 +33,7 @@ def test_discover():
     for b in bad:
         print("  坏件:", b)
     assert "fake" in ok, "kernels/fake 没被识别"
-    assert "a1111" in ok, "kernels/a1111 没被识别"
+    assert "neoforge-sd15" in ok, "kernels/neoforge-sd15 没被识别（主力内核不能丢）"
     return ok
 
 

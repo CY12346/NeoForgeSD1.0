@@ -3,6 +3,7 @@
   "id": "fake",
   "name": "假内核（管道自测，不出图）",
   "version": "0.1.0",
+  "hidden": true,
   "dialect": "custom",
   "command": ["{python}", "{kernel}/fake_kernel.py", "{port}"],
   "cwd": "{kernel}",

@@ -17,7 +17,7 @@ def main():
     print(f"HERE={L.HERE}")
     print(f"BASE_DIR={L.BASE_DIR}")
     assert os.path.isdir(L.BASE_DIR), "BASE_DIR 不存在"
-    assert L.VERSION.startswith("1.3"), "版本号没升到 1.3"
+    assert tuple(int(x) for x in L.VERSION.split(".")) >= (1, 4), f"版本号没跟上：{L.VERSION}"
 
     from core import detect
     manifests, bad = L.discover_all()

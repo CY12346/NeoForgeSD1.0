@@ -1,5 +1,38 @@
 # 更新日志
 
+## 1.4.1 ｜ 2026-11-04 收掉内核登记册里的两条历史包袱
+
+用户问「里面为啥还有一个 A1111（绘世）启动器」——那其实是 1.2.2 时代的老内核
+`kernels/a1111`（`command` 直接指向 `ui/image_app.py`），跟 `neoforge-sd15` **端口都是 8899**、
+功能完全重叠。更糟的是启动器 `selection_set(0)` 按名字排序选中它，等于默认用了老的那条。
+
+- `kernels/a1111` → 归档到 `_parked/kernels/a1111`（归档不删除）
+- `kernels/fake` 加 `"hidden": true`：管道自测还要用它，但不再出现在界面列表里
+- 默认选中改成优先 `neoforge-sd15`（找不到才退回第一个）
+- 回归：`test_pipe` / `test_launcher_smoke` / `test_kernel_sd15` 全过，界面列表现在只剩
+  `neoforge-sd15` + `sana-sprint` 两个真内核
+
+## 1.4.0 ｜ 2026-11-04 已发版（tag v1.4.0，release 带 exe）
+
+**干净安装验证**：本地 `app/` 清空 → 用 codeload 下源码 zip（119 文件）、用
+`gh release download` 下 exe（12,918,049 B，sha256 `d24b7d99…`），重装后：
+exe 起来打 `NeoForgeSD 1.4.0 启动器已就绪`、认出 4 个内核；源码跑
+`e2e_kernel_shell.py` 全通（起核 2.6 s · 后端 34.4 s · 出图 12.2 s · 收尸 4.1 s，
+383 KB 落盘）。也就是说这包不依赖本地构建产物。
+
+**这版装了什么**：
+- 下载页接魔搭在线目录，289 条（14 内置 + 275 在线），类型列细分成
+  「底模 · SD1.5 / SDXL / FLUX / LoRA / VAE / ControlNet / 放大 / 修脸」
+- 插件与 UI 本体按 GitHub 热度排行：A1111 ★16.5万 > ComfyUI ★14.5万 > ControlNet
+  ★1.8万 > Forge ★1.3万 > ADetailer ★4.8k > 提示词补全 ★3.2k > 标签补全 ★2.8k > 汉化 ★479
+  （冷启动用内置实测值，7 天后后台刷新 `work/popularity.json`）
+- 第二内核 `kernels/sana-sprint`：`PIPE:READY` + 出图 14.3 s / 峰值 4.13 GiB 实测通过，
+  端口 8898，跟 sd15 并存**不替换**（理由见下一条 CHANGELOG）
+
+**发布踩到的坑**：`tools/_push_via_api.py` 在 `.github/workflows/ci.yml` 上报 404 ——
+推 workflow 文件要 `workflow` scope，当前 token 只有 `repo/gist/read:org`。已在脚本里
+把 `.github/` 排除，CI 那条待办仍挂着（`gh auth refresh -h github.com -s workflow`）。
+
 ## 未发布 ｜ 新架构调研：SANA-Sprint 能跑，但不值得换掉 SD1.5 内核
 
 问题：网上有没有新的生图架构，能替掉 `kernels/neoforge-sd15`，至少保住 SD1.5 的生图能力。
