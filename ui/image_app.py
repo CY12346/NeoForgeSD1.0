@@ -33,6 +33,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
+from core import winproc
+
 try:                                    # 提示词中⇄英 / 词库 / 补全（词典来自本机 SD 扩展）
     from core import i18n_tags
     I18N_ERR = ""
@@ -171,9 +173,8 @@ def _boot_backend():
     f = open(log, "ab")
     proc = None
     try:
-        proc = subprocess.Popen([SD_PY, "webui.py"] + SD_ARGS, cwd=SD_HOME, env=env,
-                                stdout=f, stderr=f,
-                                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        proc = winproc.popen([SD_PY, "webui.py"] + SD_ARGS, cwd=SD_HOME, env=env,
+                             stdout=f, stderr=f)
         START["pid"] = proc.pid
     except Exception as e:
         START.update(state="failed", msg=f"拉起失败：{e}")
@@ -212,7 +213,7 @@ def stop_sd():
     if START.get("pid"):
         pids.add(int(START["pid"]))
     try:
-        raw = subprocess.run(["netstat", "-ano"], capture_output=True, timeout=20).stdout
+        raw = winproc.run(["netstat", "-ano"], capture_output=True, timeout=20).stdout
         out = raw.decode("gbk", "replace")  # netstat 在本机是 GBK；text=True 会被 PYTHONUTF8 带偏
         for line in out.splitlines():
             if ":7860" in line and "LISTENING" in line.upper():
@@ -224,7 +225,7 @@ def stop_sd():
     killed = []
     for pid in pids:
         try:
-            subprocess.run(["taskkill", "/PID", str(pid), "/F", "/T"],
+            winproc.run(["taskkill", "/PID", str(pid), "/F", "/T"],
                            capture_output=True, timeout=20)
             killed.append(pid)
         except Exception:

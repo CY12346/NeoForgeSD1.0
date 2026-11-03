@@ -22,6 +22,10 @@ NeoForgeSD/
       fake_kernel.py
     a1111/
       kernel.json
+    neoforge-sd15/          # 拆出来的 SD1.5 内核（代码在核里，见 KERNEL-neoforge-sd15.md）
+      kernel.json
+      kernel_main.py
+      app/                  # 构建产物：ui/ + core/ 的副本
   backend/                  # 核自己的目录，壳不管
   models/
   work/
@@ -53,6 +57,7 @@ NeoForgeSD/
   },
   "progress": {"pattern": "PIPE:PROGRESS ([0-9.]+)\\s*(.*)"},
   "needs": {"models": ["Stable-diffusion"], "vram_gb": 4},   // 环境侦探用；缺了不拦，只亮灯
+  "outputs": "{base}/backend/outputs",  // 可选：出图目录。壳据此显示张数、开目录；不写就只是少一条信息
   "stop": {"grace_s": 5}             // 温和终止等待秒数，超时强杀
 }
 ```
@@ -94,6 +99,8 @@ NeoForgeSD/
 | `{python}` | `{base}/backend/python/python.exe`（存在时），否则 `sys.executable` |
 | `{port}` | manifest 自己的 `port` |
 | `{kernel}` | 该内核自己的目录 |
+
+`outputs` 可以是相对路径，相对 `{base}` 解析后存成绝对路径；壳只显示和打开，不替核决定存哪。
 
 不做 `%VAR%` 展开，不调 shell，避免中文路径与引号坑。
 

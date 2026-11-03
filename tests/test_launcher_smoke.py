@@ -31,12 +31,17 @@ def main():
     app.update()
     app.reload_kernels()
     app.update()
-    print(f"窗口已建：title={app.title()} 内核下拉={app.cmb['values']}")
-    assert app.cmb["values"], "下拉是空的"
+    listed = [app.lb.get(i) for i in range(app.lb.size())]
+    print(f"窗口已建：title={app.title()} 内核列表={[s.strip() for s in listed]}")
+    assert listed, "内核列表是空的"
+    assert app.ids, "内核 id 表是空的"
+    assert not any("  a1111 · A1111" in s for s in listed), "列表把 id 念了两遍"
+    print(f"主题={'sv-ttk' if L.HAS_SVTTK else 'ttk 手配'}")
 
     m = app.current_manifest()
     print(f"当前内核={m['id'] if m else None} 端口={m['port'] if m else None}")
     assert m, "选不出内核"
+    assert app.lbl_kernel.cget("text"), "内核详情是空的"
 
     items = detect.run_checks(L.BASE_DIR)
     level, summary = detect.verdict(items)

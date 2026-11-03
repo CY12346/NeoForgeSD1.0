@@ -12,11 +12,13 @@ a = Analysis(
     binaries=[],
     datas=[
         ('kernels', 'kernels'),         # 随包带 fake 内核（管道自测用）
+        ('tools/7zr.exe', 'tools'),     # 解官方整合包（.7z）要用
+        ('assets', 'assets'),           # 图标
         ('SPEC-kernel.md', '.'),
         ('INSTALL.md', '.'),
         ('CHANGELOG.md', '.'),
     ],
-    hiddenimports=['psutil'],
+    hiddenimports=['psutil', 'sv_ttk'],   # sv_ttk 的 tcl 主题由 hooks-contrib 自动收
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -45,4 +47,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='assets/neoforge.ico',
 )

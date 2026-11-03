@@ -1,0 +1,645 @@
+# -*- coding: utf-8 -*-
+"""NeoForgeSD 1.3.0 —— 启动器（壳）。
+
+壳归壳，核归核：
+  - 壳不认识任何出图后端，只认 kernels/<名字>/kernel.json
+  - 起核、判活、报进度、收尸，全走 core/pipe.py 的管道协议
+  - 环境侦探 core/detect.py 把「缺什么、怎么补」说成人话
+
+界面：sv-ttk 打底（Win11 Fluent，+50KB），品牌橙只用在自绘元素上
+（启动键、状态点、选中行、进度条），因为 sv-ttk 的按钮强调色是预渲染雪碧图，改不动。
+
+包体 <10MB，不含任何后端与模型权重。
+
+打包：pyinstaller NeoForgeSD.spec
+"""
+import json
+import os
+import sys
+import threading
+import time
+import tkinter as tk
+from tkinter import messagebox, ttk
+
+APP_NAME = "NeoForgeSD"
+VERSION = "1.3.0"
+
+ACCENT = "#ff7a2f"          # 锻造橙
+ACCENT_HOVER = "#ff9457"
+INK = "#141414"             # 橙底上的字
+
+# ---------------------------------------------------------------- 路径
+if getattr(sys, "frozen", False):
+    HERE = os.path.dirname(os.path.abspath(sys.executable))
+else:
+    HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# 便携包：exe 同级有 backend/ 或 models/；开发仓库：脚本在 app/ 下
+if os.path.isdir(os.path.join(HERE, "backend")) or os.path.isdir(os.path.join(HERE, "models")):
+    BASE_DIR = HERE
+else:
+    BASE_DIR = os.path.dirname(HERE) if os.path.basename(HERE) == "app" else HERE
+
+WORK_DIR = os.path.join(BASE_DIR, "work")
+LOG_FILE = os.path.join(WORK_DIR, "launcher.log")
+
+sys.path.insert(0, BASE_DIR)
+for extra in (os.path.join(BASE_DIR, "app"), HERE):
+    if os.path.isdir(extra) and extra not in sys.path:
+        sys.path.insert(0, extra)
+
+try:
+    from core import detect, kernel, pipe, repair, selfcheck, singleton
+except ImportError as e:  # 壳缺件要说人话，不能黑框闪退
+    print(f"启动器缺少 core 模块：{e}")
+    raise
+
+try:                        # 主题库可缺省：没有就退回 ttk 手配样式，功能不受影响
+    import sv_ttk
+    HAS_SVTTK = True
+except ImportError:
+    HAS_SVTTK = False
+
+LEVEL_ICON = {detect.GREEN: "●", detect.YELLOW: "◐", detect.RED: "○"}
+LEVEL_COLOR = {detect.GREEN: "#3ddc84", detect.YELLOW: "#ffc53d", detect.RED: "#ff5c5c"}
+
+PALETTE = {"bg": "#1c1c1c", "fg": "#ffffff", "sub": "#9aa3b2", "panel": "#12161d"}
+
+
+def kernel_roots():
+    """内核可能放两处：便携包根目录（exe 同级），或仓库里的 app/kernels。"""
+    roots = []
+    for r in (BASE_DIR, HERE):
+        kd = os.path.join(r, "kernels")
+        if os.path.isdir(kd) and kd not in [os.path.join(x, "kernels") for x in roots]:
+            roots.append(r)
+    return roots or [BASE_DIR]
+
+
+def discover_all():
+    """合并所有根目录下的内核；同 id 以先找到的为准。坏件单独列出。"""
+    out, bad, seen = {}, [], set()
+    for root in kernel_roots():
+        for m, err in kernel.discover(root, base_dir=BASE_DIR):
+            if m:
+                if m["id"] not in seen:
+                    seen.add(m["id"])
+                    out[m["id"]] = m
+            else:
+                bad.append(err)
+    return out, bad
+
+
+def display_name(m):
+    """id 已经念过一遍就别再念第二遍（原来 a1111 · A1111 · NeoForgeSD 前端）。"""
+    name = m.get("name", m["id"])
+    return name if m["id"].lower() in name.lower() else f"{m['id']} · {name}"
+
+
+STATE_TEXT = {
+    pipe.IDLE: "未启动",
+    pipe.STARTING: "启动中…",
+    pipe.GREEN: "运行中",
+    pipe.YELLOW: "运行中（健康检查异常）",
+    pipe.STOPPED: "已停止",
+    pipe.FAILED: "出错",
+}
+
+
+class Gauge(tk.Canvas):
+    """自绘橙色进度条：sv-ttk 的进度条是雪碧图，改不了色，这只自己画。"""
+
+    def __init__(self, parent, bg, height=10, fg=ACCENT, track="#232a36"):
+        super().__init__(parent, height=height, bg=bg, highlightthickness=0, bd=0)
+        self._v = 0.0
+        self._fg, self._track = fg, track
+        self.bind("<Configure>", lambda _e: self._draw())
+
+    def set(self, v):
+        self._v = max(0.0, min(1.0, float(v)))
+        self._draw()
+
+    def _draw(self):
+        self.delete("all")
+        w, h = self.winfo_width(), self.winfo_height()
+        if w <= 2 or h <= 2:
+            return
+        r = h / 2.0
+        self.create_oval(0, 0, h, h, fill=self._track, outline="")
+        self.create_oval(w - h, 0, w, h, fill=self._track, outline="")
+        self.create_rectangle(r, 0, w - r, h, fill=self._track, outline="")
+        if self._v <= 0:
+            return
+        fw = max(h, w * self._v)
+        self.create_oval(0, 0, h, h, fill=self._fg, outline="")
+        self.create_oval(fw - h, 0, fw, h, fill=self._fg, outline="")
+        self.create_rectangle(r, 0, max(r, fw - r), h, fill=self._fg, outline="")
+
+
+class Launcher(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title(f"{APP_NAME} {VERSION}")
+        self.geometry("900x640+120+80")
+        self.minsize(820, 580)
+        self.runner = None
+        self.busy = False
+        self.manifests = {}
+        self.ids = []
+        self.bad = []
+        self._apply_theme()
+        self._build_ui()
+        self._set_icon()
+        self.after(60, self._dark_titlebar)
+        self.after(100, self.reload_kernels)
+
+    # ------------------------------------------------------------------ 主题
+    def _set_icon(self):
+        for cand in (os.path.join(HERE, "assets", "neoforge.ico"),
+                     os.path.join(BASE_DIR, "app", "assets", "neoforge.ico"),
+                     os.path.join(getattr(sys, "_MEIPASS", ""), "assets", "neoforge.ico")):
+            if cand and os.path.isfile(cand):
+                try:
+                    self.iconbitmap(cand)
+                    return
+                except tk.TclError:
+                    pass
+
+    def _dark_titlebar(self):
+        """Win11 系统标题栏跟着变深，不然深色窗口顶着一条白条。"""
+        if sys.platform != "win32":
+            return
+        try:
+            import ctypes
+            self.update_idletasks()
+            hwnd = ctypes.windll.user32.GetParent(self.winfo_id())
+            on = ctypes.c_int(1)
+            for attr in (20, 19):          # DWMWA_USE_IMMERSIVE_DARK_MODE（20/19 两个版本号都试）
+                ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                    hwnd, attr, ctypes.byref(on), ctypes.sizeof(on))
+            cap = ctypes.c_int(0x001C1C1C)  # COLORREF: 0x00BBGGRR
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd, 35, ctypes.byref(cap), ctypes.sizeof(cap))
+        except Exception:
+            pass
+
+    def _apply_theme(self):
+        if HAS_SVTTK:
+            sv_ttk.set_theme("dark")
+        else:
+            style = ttk.Style(self)
+            try:
+                style.theme_use("clam")
+            except tk.TclError:
+                pass
+            style.configure("TFrame", background=PALETTE["bg"])
+            style.configure("TLabel", background=PALETTE["bg"], foreground=PALETTE["fg"])
+        self.configure(bg=PALETTE["bg"])
+        # 从主题里读真实底色，别硬编码
+        def look(widget, opt):
+            try:
+                return self.tk.call("ttk::style", "lookup", widget, "-" + opt)
+            except tk.TclError:
+                return ""
+        self.P = {
+            "bg": look("TFrame", "background") or PALETTE["bg"],
+            "fg": look("TLabel", "foreground") or PALETTE["fg"],
+            "sub": "#8b94a7",
+            "sunken": "#0d1016",
+        }
+
+    # ------------------------------------------------------------------ UI
+    def _build_ui(self):
+        p = self.P
+        font_ui = ("Microsoft YaHei UI", 10)
+        font_bold = ("Microsoft YaHei UI", 10, "bold")
+        font_small = ("Microsoft YaHei UI", 9)
+        font_mono = ("Consolas", 9)
+
+        # ---- 顶栏
+        head = ttk.Frame(self, padding=(20, 14, 20, 4))
+        head.pack(fill="x")
+        brand = tk.Frame(head, bg=p["bg"])
+        brand.pack(side="left")
+        tk.Label(brand, text="⬢", bg=p["bg"], fg=ACCENT,
+                 font=("Segoe UI Symbol", 20)).pack(side="left", padx=(0, 8))
+        tk.Label(brand, text=APP_NAME, bg=p["bg"], fg=p["fg"],
+                 font=("Microsoft YaHei UI", 18, "bold")).pack(side="left")
+        tk.Label(brand, text=f"  v{VERSION} · 壳归壳，核归核", bg=p["bg"], fg=p["sub"],
+                 font=font_small).pack(side="left", pady=(8, 0))
+        self.lbl_state = tk.Label(head, text="· 检测中…", bg=p["bg"], fg=p["sub"],
+                                  font=font_ui, anchor="e", justify="right", wraplength=430)
+        self.lbl_state.pack(side="right", pady=(8, 0), fill="x")
+
+        foot = tk.Frame(self, bg=p["bg"])
+        foot.pack(side="bottom", fill="x", padx=20, pady=(0, 14))
+        ttk.Style(self).configure("Act.TButton", padding=(16, 6),
+                                  font=("Microsoft YaHei UI", 10))
+        self.btn_outdir = ttk.Button(foot, text="图片", style="Act.TButton",
+                                     command=self.on_open_outputs, state="disabled")
+        self.btn_outdir.pack(side="left")
+        self.btn_repair = ttk.Button(foot, text="维修", style="Act.TButton",
+                                     command=self.on_repair)
+        self.btn_repair.pack(side="left", padx=8)
+
+        body = ttk.Frame(self, padding=(20, 8, 20, 16))
+        body.pack(fill="both", expand=True)
+
+        # ---- 左：内核登记册
+        left = ttk.Frame(body, width=214)
+        left.pack(side="left", fill="y", padx=(0, 16))
+        left.pack_propagate(False)
+        tk.Label(left, text="内核", bg=p["bg"], fg=p["sub"],
+                 font=font_small).pack(anchor="w", pady=(0, 5))
+        self.lb = tk.Listbox(
+            left, bg=p["sunken"], fg=p["fg"], selectbackground=ACCENT,
+            selectforeground=INK, bd=0, highlightthickness=1,
+            highlightbackground=p["sunken"], highlightcolor=ACCENT,
+            font=("Microsoft YaHei UI", 11), activestyle="none",
+            exportselection=False, height=5)
+        self.lb.pack(fill="x")
+        self.lb.bind("<<ListboxSelect>>", lambda _e: self.refresh_detail())
+        self.lbl_kernel = tk.Label(left, text="", bg=p["bg"], fg=p["sub"],
+                                   font=font_mono, justify="left", anchor="w")
+        self.lbl_kernel.pack(anchor="w", pady=(8, 0), fill="x")
+        tk.Frame(left, bg=p["bg"]).pack(fill="both", expand=True)
+
+        # ---- 右：侦探 + 动作 + 进度 + 日志
+        right = ttk.Frame(body)
+        right.pack(side="left", fill="both", expand=True)
+
+        tk.Label(right, text="环境侦探", bg=p["bg"], fg=p["fg"],
+                 font=("Microsoft YaHei UI", 11, "bold")).pack(anchor="w", pady=(0, 6))
+        card = tk.Frame(right, bg=p["sunken"], highlightthickness=1,
+                        highlightbackground="#252c38")
+        card.pack(fill="x")
+        self.rows = {}
+        for key in ("python", "models", "port", "disk", "gpu", "kernels"):
+            row = tk.Frame(card, bg=p["sunken"])
+            row.pack(fill="x", padx=12, pady=2)
+            lamp = tk.Label(row, text="·", bg=p["sunken"], fg=p["sub"],
+                            font=font_bold, width=2, anchor="w")
+            lamp.pack(side="left")
+            name = tk.Label(row, text="", bg=p["sunken"], fg=p["fg"],
+                            font=font_bold, width=11, anchor="w")
+            name.pack(side="left")
+            val = tk.Label(row, text="检测中…", bg=p["sunken"], fg=p["sub"],
+                           font=font_mono, anchor="w", justify="left", wraplength=520)
+            val.pack(side="left", fill="x", expand=True)
+            self.rows[key] = (lamp, name, val)
+        card.bind("<Configure>", lambda e: self._relayout_card(e.width))
+
+        # ---- 出图目录（核在 kernel.json 里自己声明，壳只显示不猜）
+        outrow = tk.Frame(right, bg=p["bg"])
+        outrow.pack(fill="x", pady=(10, 0))
+        tk.Label(outrow, text="出图", bg=p["bg"], fg=p["sub"],
+                 font=font_small).pack(side="left")
+        self.lbl_out = tk.Label(outrow, text="—", bg=p["bg"], fg=p["fg"],
+                                font=font_mono, anchor="w")
+        self.lbl_out.pack(side="left", padx=(10, 0), fill="x", expand=True)
+
+        # ---- 动作
+        acts = tk.Frame(right, bg=p["bg"])
+        acts.pack(fill="x", pady=(14, 0))
+        self.btn_start = self._accent_button(acts, "▶  启动", self.on_start)
+        self.btn_start.pack(side="left")
+        self.btn_stop = ttk.Button(acts, text="■  停止", style="Act.TButton",
+                                   command=self.on_stop, state="disabled")
+        self.btn_stop.pack(side="left", padx=8)
+        self.btn_open = ttk.Button(acts, text="打开页面", style="Act.TButton",
+                                   command=self.on_open, state="disabled")
+        self.btn_open.pack(side="left")
+
+        # ---- 进度（没进度时整行收起）
+        self.progrow = tk.Frame(right, bg=p["bg"])
+        self.bar = Gauge(self.progrow, p["bg"], height=10)
+        self.bar.pack(side="left", fill="x", expand=True, pady=(6, 0))
+        self.lbl_pct = tk.Label(self.progrow, text="", bg=p["bg"], fg=p["sub"],
+                                font=font_small, width=6, anchor="e")
+        self.lbl_pct.pack(side="left", padx=(8, 0), pady=(6, 0))
+
+        # ---- 日志（吃掉剩余空间，别让它空占半窗）
+        loghead = tk.Frame(right, bg=p["bg"])
+        loghead.pack(fill="x", pady=(16, 4))
+        self.loghead = loghead
+        tk.Label(loghead, text="日志", bg=p["bg"], fg=p["sub"], font=font_small).pack(side="left")
+        self.lbl_hint = tk.Label(loghead, text="", bg=p["bg"], fg=ACCENT, font=font_small)
+        self.lbl_hint.pack(side="right")
+
+        logf = tk.Frame(right, bg=p["bg"])
+        logf.pack(fill="both", expand=True)
+        self.log = tk.Text(logf, height=8, bg=p["sunken"], fg="#c9d1e0",
+                           insertbackground="#c9d1e0", bd=0, relief="flat",
+                           highlightthickness=1, highlightbackground="#252c38",
+                           font=("Consolas", 9), wrap="word", padx=8, pady=6)
+        sb = ttk.Scrollbar(logf, orient="vertical", command=self.log.yview)
+        self.log.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        self.log.pack(side="left", fill="both", expand=True)
+
+    def _relayout_card(self, width):
+        """卡片变宽/变窄时重设换行宽度，长值（显卡那句）不再被右边缘切掉。"""
+        wrap = max(220, width - 190)
+        for _lamp, _name, val in self.rows.values():
+            val.configure(wraplength=wrap)
+
+    def _accent_button(self, parent, text, command):
+        """橙色主按钮：sv-ttk 改不了强调色，这只自己画。"""
+        btn = tk.Button(parent, text=text, command=command, bg=ACCENT, fg=INK,
+                        activebackground=ACCENT_HOVER, activeforeground=INK,
+                        bd=0, relief="flat", cursor="hand2",
+                        font=("Microsoft YaHei UI", 11, "bold"),
+                        padx=20, pady=6, highlightthickness=0)
+        btn.bind("<Enter>", lambda _e: btn.configure(bg=ACCENT_HOVER)
+                 if str(btn["state"]) != "disabled" else None)
+        btn.bind("<Leave>", lambda _e: btn.configure(bg=ACCENT)
+                 if str(btn["state"]) != "disabled" else None)
+        return btn
+
+    # ------------------------------------------------------------------ 日志
+    def logline(self, msg):
+        import time
+        ts = time.strftime("%H:%M:%S")
+        self.log.insert("end", f"[{ts}] {msg}\n")
+        self.log.see("end")
+        try:
+            os.makedirs(WORK_DIR, exist_ok=True)
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(f"[{ts}] {msg}\n")
+        except OSError:
+            pass
+
+    # ------------------------------------------------------------- 内核登记册
+    def reload_kernels(self):
+        self.manifests, self.bad = discover_all()
+        for err in self.bad:
+            self.logline(f"✗ 内核登记失败：{err}")
+        self.lb.delete(0, "end")
+        self.ids = list(self.manifests)
+        for kid in self.ids:
+            m = self.manifests[kid]
+            self.lb.insert("end", f"  {kid}    v{m.get('version', '?')}")
+        if not self.ids:
+            self.logline("✗ kernels/ 下没有可用内核，先放一个 kernel.json")
+            self.lbl_kernel.configure(text="无内核")
+            self.refresh_detect()
+            return
+        self.lb.selection_set(0)
+        self.logline(f"内核登记册：{len(self.ids)} 个（{', '.join(self.ids)}）")
+        self.refresh_detail()
+        self.refresh_detect()
+
+    def current_manifest(self):
+        sel = self.lb.curselection()
+        if not sel or sel[0] >= len(self.ids):
+            return None
+        return self.manifests.get(self.ids[sel[0]])
+
+    # ---------------------------------------------------------------- 侦探
+    def refresh_detect(self):
+        def work():
+            items = detect.run_checks(BASE_DIR)
+            self.after(0, lambda: self._apply(items))
+        threading.Thread(target=work, daemon=True).start()
+
+    def _apply(self, items):
+        for it in items:
+            pair = self.rows.get(it["key"])
+            if not pair:
+                continue
+            lamp, name, val = pair
+            name.configure(text=it["label"])
+            level = it["level"]
+            lamp.configure(text=LEVEL_ICON.get(level, "·"),
+                           fg=LEVEL_COLOR.get(level, self.P["sub"]))
+            val.configure(text=it["detail"],
+                          fg=self.P["fg"] if level == detect.GREEN else LEVEL_COLOR.get(level, self.P["fg"]))
+        for it in items:
+            if it["level"] != detect.GREEN and it["fix"]:
+                self.logline(f"{LEVEL_ICON[it['level']]} {it['label']}：{it['fix']}")
+        level, summary = detect.verdict(items)
+        if not self.busy and time.time() > getattr(self, "_state_pin", 0):
+            mark = "" if level == detect.GREEN else "⚠ "
+            self.lbl_state.configure(text=f"{mark}{summary}",
+                                     fg=LEVEL_COLOR.get(level, self.P["sub"]))
+
+    def refresh_detail(self):
+        m = self.current_manifest()
+        if not m:
+            return
+        self.lbl_kernel.configure(
+            text=f"{display_name(m)}\n端口 {m['port']} · {m.get('dialect', '-')}\n"
+                 f"{os.path.basename(m['command'][0])}")
+        self.refresh_outputs()
+        self.refresh_port()
+        self.logline(f"选中内核 {m['id']}：{m['command'][0]} … 端口 {m['port']} 健康 {m['health']['path']}")
+
+    # ---------------------------------------------------------------- 出图
+    def refresh_outputs(self):
+        """出图目录由 kernel.json 的 outputs 声明，壳只显示 + 数张数，不猜后端布局。"""
+        m = self.current_manifest()
+        if not m:
+            self.lbl_out.configure(text="—", fg=self.P["sub"])
+            self.btn_outdir.configure(state="disabled")
+            return
+        path = m.get("outputs")
+        if not path:
+            self.lbl_out.configure(text="该内核未声明出图目录", fg=self.P["sub"])
+            self.btn_outdir.configure(state="disabled")
+            return
+        self.btn_outdir.configure(state="normal" if os.path.isdir(path) else "disabled")
+        self.lbl_out.configure(text=f"{self._short(path)}  ·  统计中…", fg=self.P["sub"])
+
+        def work():
+            n, newest = selfcheck.scan_outputs(path)
+            self.after(0, lambda: self._apply_outputs(path, n, newest))
+        threading.Thread(target=work, daemon=True).start()
+
+    def _apply_outputs(self, path, n, newest):
+        if n is None:
+            self.lbl_out.configure(text=f"{self._short(path)}  ·  目录还没建，首次出图会创建",
+                                   fg=self.P["sub"])
+            return
+        tail = f"{n} 张"
+        if newest:
+            tail += f" · 最近 {os.path.basename(newest)}"
+        self.lbl_out.configure(text=f"{self._short(path)}  ·  {tail}", fg=self.P["fg"])
+
+    @staticmethod
+    def _short(path, limit=44):
+        if len(path) <= limit:
+            return path
+        half = limit // 2 - 1
+        return f"{path[:half]}…{path[-half:]}"
+
+    def on_open_outputs(self):
+        m = self.current_manifest()
+        path = (m or {}).get("outputs")
+        if not path:
+            return
+        os.makedirs(path, exist_ok=True)
+        try:
+            os.startfile(path)                      # Windows 资源管理器
+        except AttributeError:
+            import subprocess
+            subprocess.Popen(["explorer", path])
+        except OSError as e:
+            messagebox.showerror(APP_NAME, f"打不开目录：{e}\n{path}")
+
+    # ---------------------------------------------------------------- 维修
+    def on_repair(self):
+        """诊断 → 自动修能修的 → 复检。启动器自己玩崩了也能用（命令行 python -m core.repair 同一条路）。"""
+        if self.busy or getattr(self, "_repairing", False):
+            return
+        self._repairing = True
+        self.btn_repair.configure(state="disabled")
+        self.logline("—— 维修：诊断 → 自动修 → 复检 ——")
+        port = (self.current_manifest() or {}).get("port")
+        own_ports = (port,) if self._running() and port else ()
+
+        def show_act(a):
+            icon = "✓" if a["ok"] else "✗"
+            self.after(0, lambda i=icon, k=a["kind"], d=a["detail"]:
+                       self.logline(f"{i} 维修 · {k}：{d}"))
+
+        def work():
+            try:
+                actions, items, level, summary = repair.run(
+                    BASE_DIR, progress=show_act, own_ports=own_ports)
+                path = repair.write_report(actions, items, level, summary, BASE_DIR)
+            except Exception as e:
+                self.after(0, lambda: self.logline(f"✗ 维修自身出错：{e}"))
+                self.after(0, lambda: self._repair_done(None, None, None, None, None))
+                return
+            self.after(0, lambda: self._repair_done(actions, items, level, summary, path))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _repair_done(self, actions, items, level, summary, path):
+        self._repairing = False
+        self.btn_repair.configure(state="normal")
+        if items is None:
+            return
+        for it in items:
+            if it["level"] != detect.GREEN:
+                self.logline(f"{LEVEL_ICON[it['level']]} 复检 · {it['label']}：{it['detail']}")
+        self.refresh_detect()          # 先让侦探把卡片刷成最新，别让它盖掉维修结论
+        self.refresh_outputs()
+        mark = "" if level == detect.GREEN else "⚠ "
+        self._state_pin = time.time() + 8      # 侦探 0.2s 后回来，别把结论盖掉
+        self.lbl_state.configure(text=f"{mark}维修后：{summary}",
+                                 fg=LEVEL_COLOR.get(level, self.P["sub"]))
+        self.logline(f"维修结论：{summary}")
+        self.logline(f"报告：{path}")
+        if messagebox.askyesno(f"{APP_NAME} · 维修",
+                               f"{summary}\n\n报告已写入：\n{path}\n\n现在打开吗？"):
+            try:
+                os.startfile(path)
+            except (AttributeError, OSError):
+                pass
+
+    # ---------------------------------------------------------------- 起停
+    def on_start(self):
+        if self.busy:
+            return
+        m = self.current_manifest()
+        if not m:
+            messagebox.showerror(APP_NAME, "没有可启动的内核。\n请检查 kernels/ 下的 kernel.json。")
+            return
+        self.busy = True
+        self.btn_start.configure(state="disabled", bg=ACCENT)
+        self.btn_stop.configure(state="normal")
+        self.bar.set(0)
+        self.progrow.pack(fill="x", pady=(12, 0), before=self.loghead)
+        self.lbl_pct.configure(text="0%")
+        self.logline(f"启动内核 {m['id']} · 命令 {' '.join(m['command'])}")
+        threading.Thread(target=self._boot, args=(m,), daemon=True).start()
+
+    def _boot(self, m):
+        self.runner = pipe.KernelRunner(
+            m,
+            log=lambda msg: self.after(0, lambda: self.logline(msg)),
+            on_progress=lambda f, t: self.after(0, lambda: self._progress(f, t)),
+            on_state=lambda s, d: self.after(0, lambda: self._state(s, d)),
+        )
+        ok = self.runner.start(wait_ready=300)
+        self.busy = False
+        if ok:
+            self.after(0, self.on_open)
+        else:
+            self.after(0, lambda: self.logline(f"✗ 起不来：{self.runner.last_error}"))
+        self.after(0, lambda: self.btn_start.configure(
+            state="normal" if not ok or not self._running() else "disabled"))
+
+    def _running(self):
+        return bool(self.runner and self.runner.proc and self.runner.proc.poll() is None)
+
+    def _progress(self, frac, text):
+        self.bar.set(frac)
+        self.lbl_pct.configure(text=f"{frac:.0%}")
+        self.lbl_hint.configure(text=text)
+        self.title(f"{APP_NAME} {VERSION} · {frac:.0%} {text}")
+
+    def _state(self, state, detail):
+        self.lbl_state.configure(
+            text=STATE_TEXT.get(state, state),
+            fg=LEVEL_COLOR.get(state, self.P["sub"]))
+        if state == pipe.GREEN:
+            self.title(f"{APP_NAME} {VERSION}")
+            self.btn_start.configure(state="disabled", bg=ACCENT)
+            self.btn_stop.configure(state="normal")
+            self.btn_open.configure(state="normal")
+            self.lbl_hint.configure(text="")
+            self.bar.set(1.0)
+            self.lbl_pct.configure(text="100%")
+
+    def on_stop(self):
+        if not self.runner:
+            return
+        self.btn_stop.configure(state="disabled")
+        self.logline("正在停止…")
+
+        def work():
+            clean, alive = self.runner.stop()
+            self.after(0, lambda: self.logline("已停止：端口释放，无孤儿" if clean
+                                               else f"✗ 停止不干净，残留 {alive}"))
+            self.after(0, lambda: self.btn_start.configure(state="normal", bg=ACCENT))
+            self.after(0, lambda: self.btn_open.configure(state="disabled"))
+            self.after(0, lambda: self.bar.set(0))
+            self.after(0, lambda: self.lbl_pct.configure(text=""))
+            self.after(0, lambda: self.progrow.pack_forget())
+            self.after(0, lambda: self.title(f"{APP_NAME} {VERSION}"))
+        threading.Thread(target=work, daemon=True).start()
+
+    def on_open(self):
+        import webbrowser
+        m = self.current_manifest()
+        port = m["port"] if m else 8899
+        webbrowser.open(f"http://127.0.0.1:{port}/")
+
+
+def main():
+    os.makedirs(WORK_DIR, exist_ok=True)
+    try:
+        app = Launcher()
+    except Exception as e:                  # pythonw 双击起时没有控制台，异常要弹窗说人话
+        import traceback
+        err = traceback.format_exc()
+        try:
+            os.makedirs(WORK_DIR, exist_ok=True)
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(err)
+        except OSError:
+            pass
+        root = tk.Tk()
+        root.withdraw()
+        messagebox.showerror(f"{APP_NAME} 启动失败", f"{e}\n\n详情见 {LOG_FILE}")
+        return
+    app.logline(f"{APP_NAME} {VERSION} 启动器已就绪（壳不含后端）")
+    app.logline(f"根目录：{BASE_DIR}")
+    app.logline(f"主题：{'sv-ttk dark' if HAS_SVTTK else 'ttk 手配（没装 sv-ttk）'}")
+    app.mainloop()
+
+
+if __name__ == "__main__":
+    main()

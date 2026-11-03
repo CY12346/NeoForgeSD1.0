@@ -91,6 +91,13 @@ def load_manifest(path, base_dir=None):
     m["cwd"] = _resolve(ph, m.get("cwd") or "{base}")
     m["command"] = [_resolve(ph, c) for c in cmd]
 
+    # 出图目录（可选）：核自己说清楚产物落在哪，壳只负责显示/打开，不猜后端布局。
+    if m.get("outputs"):
+        out = _resolve(ph, str(m["outputs"]))
+        if not os.path.isabs(out):
+            out = os.path.join(ph["base"], out)
+        m["outputs"] = os.path.normpath(out)
+
     # 脚本查找路径：相对路径的 .py 允许在 cwd / {base} / {base}/app / {kernel} 里找，
     # 这样同一份 kernel.json 在「便携包」和「开发仓库」两种布局下都能用。
     search = [m["cwd"], ph["base"], os.path.join(ph["base"], "app"), ph["kernel"]]

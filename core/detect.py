@@ -10,6 +10,8 @@ import shutil
 import socket
 import subprocess
 
+from . import winproc
+
 GREEN, YELLOW, RED = "green", "yellow", "red"
 
 
@@ -22,7 +24,7 @@ def check_python(base):
     py = os.path.join(base, "backend", "python", "python.exe")
     if os.path.isfile(py):
         try:
-            out = subprocess.run([py, "-c", "import sys;print(sys.version.split()[0])"],
+            out = winproc.run([py, "-c", "import sys;print(sys.version.split()[0])"],
                                  capture_output=True, timeout=20)
             ver = out.stdout.decode("utf-8", "replace").strip() or "?"
             return _item("python", "后端 Python", GREEN, f"{ver} · {py}")
@@ -79,7 +81,7 @@ def check_gpu(_base=None, need_gb=4):
         return _item("gpu", "显卡", YELLOW, "没找到 nvidia-smi",
                      "没有 N 卡也能跑（CPU 出图极慢），或用 --use-cpu 模式验证流程")
     try:
-        out = subprocess.run(
+        out = winproc.run(
             [exe, "--query-gpu=name,memory.total,memory.used", "--format=csv,noheader,nounits"],
             capture_output=True, timeout=20)
         line = out.stdout.decode("utf-8", "replace").strip().splitlines()

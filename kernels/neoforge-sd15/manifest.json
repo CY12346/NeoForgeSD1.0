@@ -1,0 +1,88 @@
+{
+  "id": "neoforge-sd15",
+  "version": "1.3.0",
+  "built_at": "2026-11-03T22:45:51",
+  "source_commit": "5ccde89",
+  "files": [
+    {
+      "path": "README.md",
+      "size": 1872,
+      "sha256": "536d1d025c754a235ca45b9698d021ba9e8c5283ea64e122dc6587d096eec049"
+    },
+    {
+      "path": "kernel.json",
+      "size": 989,
+      "sha256": "6bffdc051bdcba0c2ebb189c5f6f85da3f450150b2e9602195a4c977faa38047"
+    },
+    {
+      "path": "kernel_main.py",
+      "size": 4869,
+      "sha256": "adc2ddefbf4b24b7e93a627642f35f5c1095f7c518f8fdee10586d965bdd02ed"
+    },
+    {
+      "path": "neoforge/__init__.py",
+      "size": 861,
+      "sha256": "3e423778632fb2069eebdae59743f70f27ea3f955bf03c9db489fb459473454a"
+    },
+    {
+      "path": "neoforge/_vendor/__init__.py",
+      "size": 539,
+      "sha256": "6c549a2ff64014ab1db3ba7b68158415a0ca7cc451be9df3b48d3161bb59d43e"
+    },
+    {
+      "path": "neoforge/_vendor/i18n_tags.py",
+      "size": 18218,
+      "sha256": "4ba6178e67810d32fb4be3ff4d4cba67b8881bb01f5484d097bfe2289a76fd52"
+    },
+    {
+      "path": "neoforge/_vendor/winproc.py",
+      "size": 2546,
+      "sha256": "12eb4f53875a63bc4ac6acba1631d22e61fe634fa23e64d4af6fd52a7273ef48"
+    },
+    {
+      "path": "neoforge/config.py",
+      "size": 2900,
+      "sha256": "9dee3955af041e44231e7b79e3282d0983f726424bec9ca04c8e969c15ead37c"
+    },
+    {
+      "path": "neoforge/engine.py",
+      "size": 4619,
+      "sha256": "8fd15f164990d61849784ec62acd00f366012328500949aa377f1f0344c62392"
+    },
+    {
+      "path": "neoforge/history.py",
+      "size": 1033,
+      "sha256": "6f12fb5e5410255495d5a7bdf2e150f28843294915bccca6de6b499ea2fe5fc4"
+    },
+    {
+      "path": "neoforge/jobs.py",
+      "size": 3963,
+      "sha256": "0a5287c6f827278dcb6dba40b222728c2e0da088bf52608d850f09f0a36557ba"
+    },
+    {
+      "path": "neoforge/payload.py",
+      "size": 5311,
+      "sha256": "c037cbc50026195bbeba58154d15a5c40502cebc8affb815b40da680148d20ac"
+    },
+    {
+      "path": "neoforge/sdapi.py",
+      "size": 3070,
+      "sha256": "6ef7a76a08b9d375f5cbdbf5f070d51a38cbb60e2cc800acb2716bc7394c4117"
+    },
+    {
+      "path": "neoforge/server.py",
+      "size": 11755,
+      "sha256": "99f26cae2ce4a79aa44c5c8b79cf17fd0bd7a2127dfeaaa44a74f047a6827074"
+    },
+    {
+      "path": "neoforge/textfmt.py",
+      "size": 1053,
+      "sha256": "5b720488164f4502d809e52e748f82e44d1512cf7bf07b360ba0762cb077a881"
+    },
+    {
+      "path": "neoforge/ui/image_page.html",
+      "size": 48706,
+      "sha256": "6578b8872ccfb63028df75814bb9ec0aa451b2782bf94cd6e82b1cce4738ec9b"
+    }
+  ]
+}

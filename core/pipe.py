@@ -16,6 +16,13 @@ try:
 except ImportError:  # 打包后可能没有，退到 taskkill
     psutil = None
 
+try:
+    from . import singleton, winproc
+except ImportError:
+    import sys as _sys
+    _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from core import singleton
+
 IDLE, STARTING, GREEN, YELLOW, STOPPED, FAILED = (
     "idle", "starting", "green", "yellow", "stopped", "failed")
 
@@ -77,6 +84,16 @@ class KernelRunner:
             self.log("内核已在运行，忽略重复启动")
             return True
 
+        # 单实例硬规矩：端口上已经有进程在听 = 上一份没关干净（可能是孤儿）。
+        # 4 GB 卡上两份 SD 会互相抢显存，所以这里只允许一个，绝不悄悄再起一份。
+        owner = singleton.port_owner(self.m["port"])
+        if owner:
+            self.last_error = ("端口 %s 已被 pid %s（%s）占用 —— 上一份还在跑，先停掉它"
+                               % (self.m["port"], owner["pid"], owner.get("name") or "?"))
+            self.set_state(FAILED, self.last_error)
+            self.log("✗ " + self.last_error)
+            return False
+
         cmd = self.build_cmd()
         cwd = self.m["cwd"]
         if not os.path.isdir(cwd):
@@ -93,11 +110,10 @@ class KernelRunner:
         self._ready_evt.clear()
         creation = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         try:
-            self.proc = subprocess.Popen(
+            self.proc = winproc.popen(
                 cmd, cwd=cwd, env=env,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                 text=True, encoding="utf-8", errors="replace", bufsize=1,
-                creationflags=creation,
             )
         except FileNotFoundError:
             self.last_error = f"启动命令里的程序不存在：{cmd[0]}\n照 SPEC-kernel.md 检查 command 与 {python_hint()}"
@@ -225,9 +241,9 @@ class KernelRunner:
         if self.proc.poll() is None:
             self.log(f"温和终止 {grace}s 未退出，强杀整棵进程树")
             if psutil:
-                self._kill_tree_psutil()
+                self._kill_tree_psutil(pids)
             else:
-                subprocess.run(["taskkill", "/PID", str(self.proc.pid), "/T", "/F"],
+                winproc.run(["taskkill", "/PID", str(self.proc.pid), "/T", "/F"],
                                capture_output=True, timeout=20)
         else:
             # 父进程退了，但子进程可能还在（A1111 前后端就是这种）
@@ -235,9 +251,9 @@ class KernelRunner:
             if leftovers:
                 self.log(f"父进程已退，仍有子进程存活：{leftovers} → 一并清掉")
                 if psutil:
-                    self._kill_tree_psutil()
+                    self._kill_tree_psutil(pids)
                 else:
-                    subprocess.run(["taskkill", "/PID", str(self.proc.pid), "/T", "/F"],
+                    winproc.run(["taskkill", "/PID", str(self.proc.pid), "/T", "/F"],
                                    capture_output=True, timeout=20)
 
         for t in self._threads:
@@ -256,13 +272,21 @@ class KernelRunner:
             self.log(f"✗ 停止不干净：残留 pid={alive}")
         return clean, alive
 
-    def _kill_tree_psutil(self):
-        try:
-            p = psutil.Process(self.proc.pid)
-            procs = p.children(recursive=True) + [p]
-        except Exception:
-            procs = []
-        for q in procs:
+    def _kill_tree_psutil(self, pids=None):
+        """按**预先收集**的进程树收尸。
+
+        坑（2026-11-03 实测）：父进程 terminate 后在 Windows 上立刻消失，
+        这时候再 `psutil.Process(self.proc.pid).children()` 只会抛异常 → 空列表 → 后端活着。
+        所以必须用 stop() 开头就抓好的那份 pids，不能到这一步再去反查。
+        """
+        pids = list(pids if pids is not None else self._collect_pids())
+        procs = []
+        for pid in pids:
+            try:
+                procs.append(psutil.Process(pid))
+            except Exception:
+                continue                       # 已经没了
+        for q in reversed(procs):              # 后进先出：先杀深层
             try:
                 q.terminate()
             except Exception:
@@ -284,7 +308,7 @@ def _alive(pid):
         except Exception:
             return False
     try:
-        out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}"],
+        out = winproc.run(["tasklist", "/FI", f"PID eq {pid}"],
                              capture_output=True, timeout=10).stdout.decode("gbk", "replace")
         return str(pid) in out
     except Exception:

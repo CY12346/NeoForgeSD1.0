@@ -16,7 +16,8 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
-import { spawn } from "node:child_process";
+import { spawn, execSync } from "node:child_process";
+import net from "node:net";
 import http from "node:http";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
@@ -234,6 +235,48 @@ async function sdAlive(timeoutMs = 3000) {
   } catch {
     return false;
   }
+}
+
+/* 单实例守卫：一个端口只跑一份 SD。
+ * HTTP 探活不够 —— 模型还在加载时端口已经 listen，但 /sdapi 还没响应，
+ * 这时起第二份就是两台 SD 抢一块 4 GB 卡。所以先看 TCP 端口本身。 */
+function sdPort() {
+  try {
+    return Number(new URL(CFG.sdUrl).port || 7860);
+  } catch {
+    return 7860;
+  }
+}
+
+async function portListening(port, timeoutMs = 1500) {
+  return new Promise((resolve) => {
+    const s = net.connect({ host: "127.0.0.1", port });
+    const done = (v) => {
+      try {
+        s.destroy();
+      } catch {}
+      resolve(v);
+    };
+    s.once("connect", () => done(true));
+    s.once("error", () => done(false));
+    s.setTimeout(timeoutMs, () => done(false));
+  });
+}
+
+function portOwnerPid(port) {
+  try {
+    const out = execSync("netstat -ano -p TCP", {
+      encoding: "latin1",
+      windowsHide: true,
+      timeout: 10000,
+      maxBuffer: 8 * 1024 * 1024,
+    });
+    for (const line of out.split(/\r?\n/)) {
+      const m = line.trim().match(/^TCP\s+\S+:(\d+)\s+\S+\s+LISTENING\s+(\d+)$/i);
+      if (m && Number(m[1]) === port) return Number(m[2]);
+    }
+  } catch {}
+  return null;
 }
 
 async function requireSd() {
@@ -835,6 +878,19 @@ asyncio.run(main())
 
   async sd_start(a) {
     if (await sdAlive()) return `Already running at ${CFG.sdUrl}.`;
+    const busyPort = sdPort();
+    if (await portListening(busyPort)) {
+      const pid = portOwnerPid(busyPort);
+      return (
+        `Port ${busyPort} is already listening${pid ? ` (pid ${pid})` : ""} — a Stable Diffusion backend is up or still loading.
+` +
+        `Refusing to start a second one: two SD instances on one GPU fight over the same VRAM.
+` +
+        (pid
+          ? `Wait for the first one, or stop it: taskkill /PID ${pid} /T /F`
+          : `Find it with: netstat -ano | findstr :${busyPort}`)
+      );
+    }
     await fsp.mkdir(CFG.outRoot, { recursive: true });
     const logFile = path.join(CFG.outRoot, "sd-launch.log");
     const fd = fs.openSync(logFile, "a");

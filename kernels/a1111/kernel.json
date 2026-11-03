@@ -24,6 +24,7 @@
   "ready": {"mode": "poll"},
   "progress": {"pattern": "PIPE:PROGRESS ([0-9.]+)\\s*(.*)"},
   "needs": {"models": ["Stable-diffusion"], "vram_gb": 4},
+  "outputs": "{base}/backend/outputs",
   "stop": {"grace_s": 8},
   "notes": "真正的重活在它内部：image_app.py 自己会拉起 SD 后端。这里只管把它当内核起停。"
 }

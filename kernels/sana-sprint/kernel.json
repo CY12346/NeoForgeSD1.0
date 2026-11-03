@@ -1,0 +1,30 @@
+{
+  "spec": 1,
+  "id": "sana-sprint",
+  "name": "NeoForgeSD · SANA-Sprint 内核（Linear DiT，高质量单张）",
+  "version": "1.0.0",
+  "dialect": "sana",
+  "command": ["D:/AIGC/sana-probe/venv/Scripts/python.exe", "{kernel}/kernel_main.py"],
+  "cwd": "{kernel}",
+  "args": [],
+  "env": {
+    "PYTHONUTF8": "1",
+    "PYTHONIOENCODING": "utf-8",
+    "NEOFORGE_IMAGE_PORT": "{port}",
+    "NEOFORGE_IMAGE_WORK": "{base}/work",
+    "SANA_HOME": "D:/AIGC/sana-probe"
+  },
+  "port": 8898,
+  "health": {
+    "path": "/api/status",
+    "interval_s": 2.0,
+    "timeout_s": 3.0,
+    "fail_threshold": 3
+  },
+  "ready": {"mode": "both", "pattern": "PIPE:READY port=(\\d+)"},
+  "progress": {"pattern": "PIPE:PROGRESS ([0-9.]+)\\s*(.*)"},
+  "needs": {"models": [], "vram_gb": 4},
+  "outputs": "{base}/work",
+  "stop": {"grace_s": 8},
+  "notes": "可选内核：要 7.17 GB 的 SANA-Sprint 0.6B 权重 + 独立 venv（diffusers>=0.33）。实测 512² 11 s、1024² 51 s 且峰值 6.19 GiB，比 sd15 慢；SD1.5 的 LoRA/ControlNet 在它上面用不了。只当「高质量单张」用，不替换 neoforge-sd15。"
+}

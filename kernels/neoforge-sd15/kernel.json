@@ -1,0 +1,30 @@
+{
+  "spec": 1,
+  "id": "neoforge-sd15",
+  "name": "NeoForgeSD · SD1.5 内核（自带前端 + SD 后端）",
+  "version": "1.3.0",
+  "dialect": "neoforge",
+  "command": ["{python}", "{kernel}/kernel_main.py"],
+  "cwd": "{kernel}",
+  "args": [],
+  "env": {
+    "PYTHONUTF8": "1",
+    "PYTHONIOENCODING": "utf-8",
+    "NEOFORGE_IMAGE_PORT": "{port}",
+    "NEOFORGE_SD_HOME": "{base}/backend",
+    "NEOFORGE_IMAGE_WORK": "{base}/work"
+  },
+  "port": 8899,
+  "health": {
+    "path": "/api/status",
+    "interval_s": 2.0,
+    "timeout_s": 3.0,
+    "fail_threshold": 3
+  },
+  "ready": {"mode": "both", "pattern": "PIPE:READY port=(\\d+)"},
+  "progress": {"pattern": "PIPE:PROGRESS ([0-9.]+)\\s*(.*)"},
+  "needs": {"models": ["Stable-diffusion"], "vram_gb": 4},
+  "outputs": "{base}/backend/outputs",
+  "stop": {"grace_s": 8},
+  "notes": "代码在 {kernel}/app（构建产物，源在仓库 ui/ 与 core/）。SD_HOME 指到哪里，就用哪份后端与模型；内核自己不认识壳。"
+}
