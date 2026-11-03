@@ -25,15 +25,18 @@ def show(title):
 
 def test_discover():
     show("登记册：扫 kernels/")
-    found = kernel.discover(ROOT)
+    # 自测用的假内核在 tests/kernels（不混进用户的界面列表），真内核在 kernels/
+    found = kernel.discover(os.path.join(ROOT, "tests"), base_dir=ROOT)
+    real = kernel.discover(ROOT, base_dir=ROOT)
     assert found, "一个 kernel.json 都没扫到"
     ok = {m["id"] for m, err in found if m}
+    ok_real = {m["id"] for m, err in real if m}
     bad = {err for m, err in found if err}
-    print("  可用:", sorted(ok))
+    print("  自测件:", sorted(ok), "· 真内核:", sorted(ok_real))
     for b in bad:
         print("  坏件:", b)
-    assert "fake" in ok, "kernels/fake 没被识别"
-    assert "neoforge-sd15" in ok, "kernels/neoforge-sd15 没被识别（主力内核不能丢）"
+    assert "fake" in ok, "tests/kernels/fake 没被识别"
+    assert "neoforge-sd15" in ok_real, "kernels/neoforge-sd15 没被识别（主力内核不能丢）"
     return ok
 
 
@@ -62,7 +65,7 @@ def test_manifest_errors():
 
 def test_pipe_roundtrip():
     show("管道：起 → 判活 → 进度 → 收尸")
-    manifests = {m["id"]: m for m, err in kernel.discover(ROOT) if m}
+    manifests = {m["id"]: m for m, err in kernel.discover(os.path.join(ROOT, "tests"), base_dir=ROOT) if m}
     m = manifests["fake"]
     progresses = []
     states = []
@@ -100,7 +103,7 @@ def test_pipe_roundtrip():
 
 def test_stop_when_idle():
     show("管道：没起就停，不许炸")
-    manifests = {m["id"]: m for m, err in kernel.discover(ROOT) if m}
+    manifests = {m["id"]: m for m, err in kernel.discover(os.path.join(ROOT, "tests"), base_dir=ROOT) if m}
     r = pipe.KernelRunner(manifests["fake"], log=log)
     clean, alive = r.stop()
     assert clean and not alive, "空转停止应返回干净"

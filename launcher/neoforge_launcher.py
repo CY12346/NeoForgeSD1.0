@@ -24,7 +24,7 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
 APP_NAME = "NeoForgeSD"
-VERSION = "1.4.1"
+VERSION = "1.4.2"
 LAUNCHER_VERSION = "0.3"            # 启动器自己的版本线（0.2→0.3：在线模型目录 + 双内核 + 热度榜）
 INSTALLER_LABEL = f"启动器 {LAUNCHER_VERSION}"
 

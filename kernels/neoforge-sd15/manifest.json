@@ -1,8 +1,8 @@
 {
   "id": "neoforge-sd15",
   "version": "1.3.0",
-  "built_at": "2026-11-03T22:45:51",
-  "source_commit": "5ccde89",
+  "built_at": "2026-11-04T01:22:25",
+  "source_commit": "b99cf8f",
   "files": [
     {
       "path": "README.md",
@@ -81,8 +81,8 @@
     },
     {
       "path": "neoforge/ui/image_page.html",
-      "size": 48706,
-      "sha256": "6578b8872ccfb63028df75814bb9ec0aa451b2782bf94cd6e82b1cce4738ec9b"
+      "size": 47864,
+      "sha256": "f4cdc7b4f9350a0310bb1c17c3a6ce71d8e2aa80f90674648d873b47bd190038"
     }
   ]
 }

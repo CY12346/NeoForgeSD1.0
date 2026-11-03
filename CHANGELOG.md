@@ -1,5 +1,18 @@
 # 更新日志
 
+## 1.4.2 ｜ 2026-11-04 内核登记册只剩今天这一套
+
+用户要求：界面上不要一开就有别的内核；内核包也要一起发。
+
+- `kernels/fake`（管道自测用的假内核）挪到 `tests/kernels/fake` —— 之前它虽然标了
+  `hidden`，但 `detect` 的"内核登记册"统计还把它算进去，看着像多了一个内核。
+  `test_pipe` 改成分别扫 `tests/` 与 `kernels/`。
+- `_parked/kernels/a1111`（1.2.2 时代的老内核）按用户要求彻底清掉；本地 `_dist/`
+  里 1.2.1 的三个 backend 分卷 + 1.3.0 的 exe 备份也一并清掉（省 5.6 GB，远端 release 还在）。
+- 界面列表现在就是 **neoforge-sd15 + sana-sprint**，两个都是这次做的。
+- `tools/build_kernel.py` 出的内核包 `neoforge-sd15-1.3.0.zip`（43.34 KiB，
+  sha256 `5eeac8a0…`）跟 exe 一起挂在 release 上。
+
 ## 1.4.1 ｜ 2026-11-04 收掉内核登记册里的两条历史包袱
 
 用户问「里面为啥还有一个 A1111（绘世）启动器」——那其实是 1.2.2 时代的老内核
