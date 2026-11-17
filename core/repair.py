@@ -150,6 +150,16 @@ def fix_pycache(base_dir, dry=False):
     return _act("清缓存", True, f"{verb} {removed} 个 __pycache__（下次启动自动重建）")
 
 
+def fix_hygiene(base_dir, dry=False):
+    """把散在 work 根的产物归回 work/{images,logs,reports}。只移动，不删除。"""
+    try:
+        from . import hygiene
+    except ImportError:
+        from core import hygiene
+    a = hygiene.fix_layout(base_dir, dry)
+    return _act(a["kind"], a["ok"], a["detail"])
+
+
 def fix_log(base_dir, dry=False):
     path = os.path.join(base_dir, "work", "launcher.log")
     if not os.path.isfile(path):
@@ -217,6 +227,7 @@ def run(base_dir, dry=False, progress=None, own_ports=()):
     manifests, _bad = selfcheck._discover(base_dir)
     actions = [
         emit(fix_dirs(base_dir, manifests, dry)),
+        emit(fix_hygiene(base_dir, dry)),
         emit(fix_orphans(manifests, dry)),
         emit(fix_pycache(base_dir, dry)),
         emit(fix_manifests(base_dir, dry)),

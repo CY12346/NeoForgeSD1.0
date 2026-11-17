@@ -91,6 +91,36 @@ def check_command(m):
                  f"{os.path.basename(cmd0)} · cwd {os.path.basename(m['cwd'])}")
 
 
+def check_hygiene(base_dir, manifests=()):
+    """产物落点：work 根干不干净 + 一共几处落点。把多条合并成一项，免得刷屏。"""
+    try:
+        from . import hygiene
+    except ImportError:
+        from core import hygiene
+    try:
+        issues = hygiene.collect(base_dir, manifests)
+    except Exception as e:                      # 体检不该自己把体检搞挂
+        return _item("layout", "产物落点", detect.YELLOW,
+                     f"检查本身失败：{type(e).__name__}: {str(e)[:160]}", "")
+    order = {"red": detect.RED, "yellow": detect.YELLOW, "green": detect.GREEN}
+    levels = [order.get(i["level"], detect.YELLOW) for i in issues]
+    if detect.RED in levels:
+        level = detect.RED
+    elif detect.YELLOW in levels:
+        level = detect.YELLOW
+    else:
+        level = detect.GREEN
+    if level == detect.GREEN:
+        return _item("layout", "产物落点", detect.GREEN, "；".join(i["detail"] for i in issues))
+    bad = [i for i in issues if i["level"] != "green"]
+    detail = "；".join(i["detail"] for i in bad).replace("\n", " ")[:400]
+    fixes = []
+    for i in bad:
+        if i["fix"] and i["fix"] not in fixes:
+            fixes.append(i["fix"])
+    return _item("layout", "产物落点", level, detail, "；".join(fixes))
+
+
 def check_port(m, own_ports=()):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(0.4)
@@ -190,6 +220,7 @@ def run_all(base_dir, include_probe=True, own_ports=(), progress=None):
 
     items = [emit(check_registry(base_dir))]
     ms, _bad = _discover(base_dir)
+    items.append(emit(check_hygiene(base_dir, ms)))
     for m in ms:
         items.append(emit(check_command(m)))
         items.append(emit(check_port(m, own_ports)))
