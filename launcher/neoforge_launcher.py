@@ -244,6 +244,26 @@ def _pil():
     return _PIL
 
 
+def newest_output_dir(outputs_dir):
+    """出图目录下「最近改过图片」的那一格；一格都没有就返回根目录。
+
+    产物现在按「种类/年-月-日/」分两层放，打开目录不该让人再从根目录点进去。
+    """
+    best, best_mt = "", 0.0
+    for root, dirs, files in os.walk(outputs_dir):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        for fn in files:
+            if not fn.lower().endswith(IMG_EXTS):
+                continue
+            try:
+                mt = os.path.getmtime(os.path.join(root, fn))
+            except OSError:
+                continue
+            if mt > best_mt:
+                best, best_mt = root, mt
+    return best or outputs_dir
+
+
 def scan_gallery(outputs_dir, limit=GALLERY_LIMIT):
     """递归扫出图目录里的图片，按修改时间倒序，取最近 limit 张。
 
@@ -969,13 +989,14 @@ class Launcher(tk.Tk):
         if not path:
             return
         os.makedirs(path, exist_ok=True)
+        target = newest_output_dir(path)        # 产物在 种类/日期/ 两层下：直接开到最新那格
         try:
-            os.startfile(path)                      # Windows 资源管理器
+            os.startfile(target)                      # Windows 资源管理器
         except AttributeError:
             import subprocess
-            winproc.popen(["explorer", path])
+            winproc.popen(["explorer", target])
         except OSError as e:
-            messagebox.showerror(APP_NAME, f"打不开目录：{e}\n{path}")
+            messagebox.showerror(APP_NAME, f"打不开目录：{e}\n{target}")
 
     # ---------------------------------------------------------------- 维修
     def on_repair(self):

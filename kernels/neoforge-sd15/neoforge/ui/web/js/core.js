@@ -158,8 +158,25 @@ export async function stopSD() {
   loadStatus();
 }
 
-export async function openFolder() {
-  const j = await (await fetch('/api/open_folder', { method: 'POST' })).json();
+/* 当前站在哪个页签 → 产物子目录（打开产物目录按这个走，文生图/图生图不互相跳） */
+export function currentKind() {
+  const visible = id => { const el = $(id); return el && !el.hidden; };
+  if (visible('g-late')) return 'upscale';          // ② 后期 = 放大 / 修脸
+  if (visible('g-create')) {                        // ① 创作：看三个页签哪个亮
+    if (visible('paneI2I')) return 'img2img';
+    if (visible('paneINP')) return 'inpaint';
+    return 'txt2img';
+  }
+  return '';                                        // 模型/资产页：打开产物根
+}
+
+export async function openFolder(kind) {
+  const k = (typeof kind === 'string') ? kind : currentKind();
+  const j = await (await fetch('/api/open_folder', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ kind: k })
+  })).json();
   if (!j.ok) alert(j.error || '打开失败');
 }
 

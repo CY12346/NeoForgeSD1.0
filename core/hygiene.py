@@ -118,7 +118,8 @@ def scan_layout(base_dir):
 
 def scan_outputs_roots(base_dir, manifests=()):
     """列出全部出图落点，好让人一眼看清「图会落到几个地方」。"""
-    roots = [("内核前端", os.path.join(base_dir, "work", "images"))]
+    roots = [("内核前端", os.path.join(base_dir, "work", "outputs")),
+             ("杂图归位", os.path.join(base_dir, "work", "images"))]
     for m in manifests:
         if m.get("outputs"):
             roots.append((m.get("id") or "kernel", m["outputs"]))

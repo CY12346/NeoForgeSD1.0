@@ -79,7 +79,7 @@ E:/NeoForge/backend/python/python.exe E:/NeoForge/app/kernels/neoforge-sd15/kern
 |---|---|---|
 | `NEOFORGE_SD_HOME` | 往上找三层里的 `backend` | SD 后端目录。**这是内核唯一必须外部给的路径** |
 | `NEOFORGE_IMAGE_PORT` | 8899 | 前端端口 |
-| `NEOFORGE_IMAGE_WORK` | `{SD_HOME 上一级}/work` | 历史、日志、产物索引 |
+| `NEOFORGE_IMAGE_WORK` | `{SD_HOME 上一级}/work` | 历史、日志；产物在它下面的 `outputs/<种类>/<年-月-日>/` |
 | `NEOFORGE_SD_API` | `http://127.0.0.1:7860` | SD 后端 API（后端已在别处跑时指过去即可复用） |
 | `NEOFORGE_SD_MEDVRAM` | 关 | `=1` 给小于 4 GB 的卡加 `--medvram`（4 GB 卡**不要**开，1024² 慢 18%） |
 | `NEOFORGE_SAFE_VAE` | 关 | `=1` 加 `--no-half-vae`（黑图/色偏时才开，显存 +632 MB） |
@@ -116,7 +116,12 @@ E:/NeoForge/backend/python/python.exe E:/NeoForge/app/kernels/neoforge-sd15/kern
 | GET | `/api/progress` | 透传 SD 的采样进度 |
 | GET | `/api/history` · `/api/suggest` · `/api/promptlib` · `/api/i18n` · `/api/translate` | 历史、补全、词库、中⇄英 |
 | POST | `/api/model` · `/api/vae` · `/api/options` | 切底模（SDXL 自动配 VAE）/ 切 VAE / 改设置 |
-| GET | `/files/<名字>` | 取 `work/` 下的产物 |
+| GET | `/files/<相对路径>` | 取 `work/` 下的产物，支持 `outputs/txt2img/2026-11-17/x.png` 这种子路径；`..` 与非图片扩展名一律 404 |
+| POST | `/api/open_folder` | 打开产物目录，`{"kind":"txt2img"}` 等按种类打开当日目录（不给 kind = `work/outputs` 根） |
+
+**产物落点**：`work/outputs/<种类>/<YYYY-MM-DD>/<job>_NN.png`，
+种类 = `txt2img`（文生图）/ `img2img`（图生图）/ `inpaint`（带 mask 的重绘）/ `upscale`（放大）。
+四路各走各的，历史记录的 `files` 存相对 `work/` 的路径。
 
 ---
 

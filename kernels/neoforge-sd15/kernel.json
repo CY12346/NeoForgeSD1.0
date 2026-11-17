@@ -24,7 +24,7 @@
   "ready": {"mode": "both", "pattern": "PIPE:READY port=(\\d+)"},
   "progress": {"pattern": "PIPE:PROGRESS ([0-9.]+)\\s*(.*)"},
   "needs": {"models": ["Stable-diffusion"], "vram_gb": 4},
-  "outputs": "{base}/backend/outputs",
+  "outputs": "{base}/work/outputs",
   "stop": {"grace_s": 8},
-  "notes": "代码在 {kernel}/app（构建产物，源在仓库 ui/ 与 core/）。SD_HOME 指到哪里，就用哪份后端与模型；内核自己不认识壳。"
+  "notes": "代码在 {kernel}/app（构建产物，源在仓库 ui/ 与 core/）。SD_HOME 指到哪里，就用哪份后端与模型；内核自己不认识壳。产物落在 outputs/<种类>/<年-月-日>/，种类 = txt2img / img2img / inpaint / upscale。"
 }

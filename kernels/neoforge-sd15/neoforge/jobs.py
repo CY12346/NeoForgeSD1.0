@@ -38,14 +38,32 @@ def _seed_of(resp, payload):
         return payload.get("seed")
 
 
+def _sub_kind(kind, body):
+    """job 的种类 → 产物子目录。局部重绘（带 mask 的 img2img）单独一格，不跟图生图混。"""
+    if kind == "image":
+        return "txt2img"
+    if kind == "upscale":
+        return "upscale"
+    return "inpaint" if body.get("mask") else "img2img"
+
+
+def _rel(p):
+    """落盘路径 → 相对 work 的正斜杠路径（/files/ 与历史记录都用这个）。"""
+    return os.path.relpath(p, config.WORK).replace(os.sep, "/")
+
+
 def _run(job, body, kind):
     t0 = time.time()
     job["state"] = "running"
+    sub = _sub_kind(kind, body)
     try:
+        folder = config.out_dir(sub)
+        job["folder"] = folder
+        job["sub"] = sub
         if kind == "upscale":
             r = sdapi.post("/sdapi/v1/extra-single-image", body)
             raw = base64.b64decode((r.get("image") or "").split(",")[-1])
-            p = os.path.join(config.WORK, f"{job['id']}_up.png")
+            p = os.path.join(folder, f"{job['id']}_up.png")
             with open(p, "wb") as f:
                 f.write(raw)
             job["files"] = [p]
@@ -55,19 +73,20 @@ def _run(job, body, kind):
             want = int(body.get("n_iter") or 1)
             files = []
             for i, b in enumerate((resp.get("images") or [])[:want]):
-                p = os.path.join(config.WORK, f"{job['id']}_{i:02d}.png")
+                p = os.path.join(folder, f"{job['id']}_{i:02d}.png")
                 with open(p, "wb") as f:
                     f.write(base64.b64decode(b.split(",")[-1]))
                 files.append(p)
             job["files"] = files
             job["seed"] = _seed_of(resp, body)
-        job["image_urls"] = ["/files/" + os.path.basename(p) for p in job.get("files") or []]
+        job["rel"] = [_rel(p) for p in job.get("files") or []]
+        job["image_urls"] = ["/files/" + r for r in job["rel"]]
         job["elapsed"] = round(time.time() - t0, 1)
         job["state"] = "done"
         try:
             history.add({
-                "ts": time.strftime("%Y-%m-%d %H:%M:%S"), "kind": kind,
-                "files": [os.path.basename(p) for p in job.get("files") or []],
+                "ts": time.strftime("%Y-%m-%d %H:%M:%S"), "kind": kind, "sub": sub,
+                "files": list(job["rel"]),
                 "prompt": body.get("prompt") or "", "negative": body.get("negative_prompt") or "",
                 "width": body.get("width"), "height": body.get("height"),
                 "steps": body.get("steps"), "cfg": body.get("cfg_scale"),

@@ -43,6 +43,28 @@ os.makedirs(WORK, exist_ok=True)
 HISTORY_FILE = os.path.join(WORK, "history_image.json")
 SD_LOG = os.path.join(WORK, "sd_server.log")
 
+# ---- 产物落点：work/outputs/<种类>/<年-月-日>/xxx.png
+# 文生图、图生图、局部重绘、放大各走各的，不在一个文件夹里混。
+OUTPUTS = os.path.join(WORK, "outputs")
+KINDS = {"txt2img": "文生图", "img2img": "图生图", "inpaint": "局部重绘", "upscale": "放大"}
+KIND_ALIAS = {"image": "txt2img", "edit": "img2img", "t2i": "txt2img",
+              "i2i": "img2img", "inp": "inpaint", "up": "upscale", "all": ""}
+
+
+def out_dir(kind=None, when=None):
+    """产物目录：work/outputs/<种类>/<YYYY-MM-DD>/（kind 为空 = outputs 根）。
+
+    日期用本机时间「年-月-日」，一层包住当天的图；打开产物目录就落在这里。
+    """
+    import time as _t
+    k = KIND_ALIAS.get((kind or "").strip(), (kind or "").strip())
+    if k and k not in KINDS:
+        k = "_other"
+    day = when or _t.strftime("%Y-%m-%d")
+    p = os.path.join(OUTPUTS, k, day) if k else OUTPUTS
+    os.makedirs(p, exist_ok=True)
+    return p
+
 # ---- SDXL 必须配 SDXL VAE（沿用 SD1.5 的 vae-ft-mse 会整张蓝紫花屏，2026-10-30 实测）
 SDXL_VAE = os.environ.get("NEOFORGE_SDXL_VAE", "madebyollin-sdxl-vae-fp16-fix.safetensors")
 SDXL_HINTS = ("sdxl", "sd_xl", "illustrious", "pony", "noob", "xl-v", "-xl")
@@ -66,4 +88,4 @@ def vae_for(model_name):
 def status_dict():
     """给 /api/status 与日志用的路径快照（不含 SD 在线状态）。"""
     return {"port": PORT, "sd_api": SD_API, "sd_home": SD_HOME, "work": WORK,
-            "base": BASE, "kernel": KERNEL, "page": PAGE_FILE}
+            "outputs": OUTPUTS, "base": BASE, "kernel": KERNEL, "page": PAGE_FILE}

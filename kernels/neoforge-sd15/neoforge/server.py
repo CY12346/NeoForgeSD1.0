@@ -22,7 +22,7 @@ def status():
     """给 /api/status：SD 在线状态 + 目录 + 引擎状态 + 目录清单。健康检查就打它。"""
     online = sdapi.alive()
     st = {"online": online, "api": config.SD_API, "sd_home": config.SD_HOME,
-          "work": config.WORK, "port": config.PORT,
+          "work": config.WORK, "outputs": config.OUTPUTS, "port": config.PORT,
           "model": None, "models": [], "samplers": [], "schedulers": [],
           "upscalers": [], "loras": [], "opts": {}, "backend": engine.status()}
     if online:
@@ -101,6 +101,26 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._file(p)
 
+    SAFE_EXT = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp")
+
+    def _file_under(self, root, rel):
+        """只放行 root 内的产物：拒绝绝对路径 / .. / 非图片扩展名。
+
+        产物在 work/outputs/<种类>/<日期>/ 两层下面，所以这里支持子路径，但绝不许越界。
+        """
+        name = urllib.parse.unquote(rel or "").split("?")[0].replace("\\", "/").lstrip("/")
+        if not name or ".." in name.split("/"):
+            self._json(404, {"error": "no file"})
+            return
+        p = os.path.abspath(os.path.join(root, name.replace("/", os.sep)))
+        if not p.startswith(os.path.abspath(root) + os.sep) or not os.path.isfile(p):
+            self._json(404, {"error": "no file"})
+            return
+        if os.path.splitext(p)[1].lower() not in self.SAFE_EXT:
+            self._json(404, {"error": "no file"})
+            return
+        self._file(p)
+
     def _need_dict(self):
         """词典不可用时统一的 503 人话。"""
         return {"error": "提示词词典不可用：" + textfmt.error() if textfmt.error()
@@ -174,8 +194,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(200, job)
             return
         if path.startswith("/files/"):
-            name = os.path.basename(urllib.request.unquote(path[7:]))
-            self._file(os.path.join(config.WORK, name))
+            self._file_under(config.WORK, path[7:])
             return
         self._json(404, {"error": "not found"})
 
@@ -261,11 +280,20 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/open_folder":
+            kind = (a.get("kind") or "").strip() if isinstance(a, dict) else ""
             try:
-                os.startfile(config.WORK)  # noqa: S606  (Windows 资源管理器)
-                self._json(200, {"ok": True, "folder": config.WORK})
+                folder = config.out_dir(kind)      # 没给种类 = work/outputs 根
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)[:200]})
+                return
+            if os.environ.get("NEOFORGE_SILENT") == "1":      # 自测：只报路径，不弹窗
+                self._json(200, {"ok": True, "folder": folder, "dry": True})
+                return
+            try:
+                os.startfile(folder)  # noqa: S606  (Windows 资源管理器)
+                self._json(200, {"ok": True, "folder": folder})
+            except Exception as e:
+                self._json(200, {"ok": False, "error": str(e)[:200], "folder": folder})
             return
 
         if path == "/api/model":
@@ -308,7 +336,7 @@ class Handler(BaseHTTPRequestHandler):
 
 # ---------------------------------------------------------------- 起服务
 def make_server(port=None, host=None):
-    return ThreadingHTTPServer((host or HOST, port or config.PORT), Handler)
+    return ThreadingHTTPServer((host or HOST, config.PORT if port is None else int(port)), Handler)
 
 
 def serve(on_ready=None):

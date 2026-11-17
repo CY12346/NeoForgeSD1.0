@@ -1,5 +1,28 @@
 # 更新日志
 
+## 1.4.3 ｜ 2026-11-17 产物按「种类 / 日期」分家
+
+用户反馈：出图直接丢在 `work/` 根上，点「打开产物目录」看到的还是 `work/` 那一堆
+散文件；而且要文生图和图生图别混在一起。
+
+- 落点改成 `work/outputs/<种类>/<YYYY-MM-DD>/<job>_NN.png`，种类 = `txt2img` /
+  `img2img` / `inpaint`（带 mask 的 img2img 单独一格）/ `upscale`，四路各走各的。
+- 「打开产物目录」按当前页签决定打开哪一格：创作页 → 对应页签的那一格，后期页 →
+  `upscale`，模型/资产页 → `outputs` 根。目录不存在会自动建（当天还没出图也能打开）。
+- `/files/` 改成支持子路径（`/files/outputs/txt2img/2026-11-17/xxx_00.png`），
+  并对 `..` 越界、非图片扩展名一律 404；历史记录的 `files` 同步改存相对路径。
+- `kernel.json` 的 `outputs` 从 `{base}/backend/outputs` 改为 `{base}/work/outputs`
+  —— 之前壳的图库在数一个空目录，等于从来没看见过产物。壳里「打开文件夹」现在会
+  直接开到最新那张图所在的目录。
+- `tools/migrate_outputs.py`：一次性把老产物（work 根 + work/images）连同历史记录
+  搬进新布局，只移动不删除，历史备份成 `history_image.json.bak-migrate`。
+  本机已执行：19 个文件、13 条记录。
+- 新测试 `tests/test_output_layout.py`（4 例：目录形状 / 文生图落点 / 四路不混 /
+  `/files/` 越界 + `open_folder` 按种类）；顺手修了 `make_server(port=0)` 被
+  `port or PORT` 吃掉、静默绑回 8899 的坑。
+- 同一份前端有两个拷贝（源 `ui/web/`，内核副本 `kernels/.../ui/web/`），
+  改完跑 `tools/build_kernel.py` 同步。
+
 ## 1.4.2 ｜ 2026-11-04 内核登记册只剩今天这一套
 
 用户要求：界面上不要一开就有别的内核；内核包也要一起发。
