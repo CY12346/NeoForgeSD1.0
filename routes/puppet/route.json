@@ -1,0 +1,87 @@
+{
+  "spec": 1,
+  "id": "puppet",
+  "name": "立绘木偶（形变场驱动）",
+  "kind": "video-route",
+  "notes": "用户指定的路线：单张立绘 + 形变场关键帧 → 动作由参数曲线决定，天然连贯、零显存。为什么不用 AnimateDiff 出剧本动作：实测 i2v 512² 只能给「呼吸级微动」，denoise≥0.6 掉身份、≤0.5 几乎不动，24 帧后段还糊。所以木偶与 AnimateDiff 不是备选关系——一个零显存可长片，一个吃显存只配氛围微动。",
+  "inputs": [
+    {
+      "name": "sprite",
+      "type": "image",
+      "required": true,
+      "desc": "单张立绘，建议透明背景 PNG（人物统一性靠复用同一张立绘保证）"
+    },
+    {
+      "name": "action",
+      "type": "enum",
+      "required": true,
+      "options": ["idle", "wave", "raise", "nod", "jump", "reach", "punch", "bow"],
+      "desc": "动作名。另有外部注册入口 core.traj 的 register_action()，内置 8 个模板不受影响"
+    },
+    {
+      "name": "dur",
+      "type": "number",
+      "required": false,
+      "default": 3,
+      "desc": "时长（秒）"
+    },
+    {
+      "name": "fps",
+      "type": "int",
+      "required": false,
+      "default": 24,
+      "desc": "帧率"
+    },
+    {
+      "name": "out",
+      "type": "path",
+      "required": false,
+      "default": "{base}/work/video/{action}_{dur}s.mp4",
+      "desc": "成片路径。默认落在 work/video/，别再往 work 根丢"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "clip",
+      "type": "video",
+      "desc": "MP4 成片（motion 出帧后由 ffmpeg 编码）"
+    },
+    {
+      "name": "qa",
+      "type": "text",
+      "desc": "质检报告（quality.py 产出的逐帧指标，可选步骤）"
+    }
+  ],
+  "needs": {
+    "vram_gb": 0,
+    "gpu": false,
+    "requires": ["numpy", "Pillow", "ffmpeg"]
+  },
+  "steps": [
+    {
+      "tool": "motion",
+      "entry": "{impl}/motion.py",
+      "args": {
+        "sprite": "{sprite}",
+        "action": "{action}",
+        "dur": "{dur}",
+        "fps": "{fps}",
+        "out": "{out}"
+      },
+      "desc": "形变场动作引擎：按参数曲线生成每一帧 → ffmpeg 编码"
+    },
+    {
+      "tool": "quality",
+      "entry": "{impl}/quality.py",
+      "optional": true,
+      "desc": "逐帧质检（清晰度/帧间抖动），出片后回看用"
+    }
+  ],
+  "impl": {
+    "status": "parked",
+    "path": "D:/AIGC/archive/2026-10/video-parked/parked_video/core_video",
+    "entry": "motion.py",
+    "lines": 1033,
+    "note": "motion.py 403 + traj.py 459 + quality.py 164 + __init__.py 7。视频线 2026-10 整体归档，当前 app/core 里没有这几个文件；要用先取回。依赖只有 numpy + Pillow + ffmpeg，无 torch。"
+  }
+}

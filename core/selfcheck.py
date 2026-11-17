@@ -121,6 +121,33 @@ def check_hygiene(base_dir, manifests=()):
     return _item("layout", "产物落点", level, detail, "；".join(fixes))
 
 
+def check_routes(base_dir):
+    """路线登记册：有几条路线、契约合不合规、谁的代码还在归档里。"""
+    try:
+        from . import route
+    except ImportError:
+        from core import route
+    routes, bad = [], []
+    for root in (base_dir, os.path.join(base_dir, "app")):
+        rs, bs = route.discover(root, base_dir=base_dir)
+        for r in rs:
+            if r["id"] not in {x["id"] for x in routes}:
+                routes.append(r)
+        bad += bs
+    if bad:
+        return _item("routes", "路线登记册", detect.RED,
+                     "；".join(bad)[:300], "修 route.json 里报出来的字段")
+    if not routes:
+        return _item("routes", "路线登记册", detect.YELLOW,
+                     "还没有任何路线契约",
+                     "建 routes/<id>/route.json（格式见 core/route.py 顶部）")
+    detail = f"{len(routes)} 条：" + "；".join(route.route_md(r) for r in routes)
+    parked = [r["id"] for r in routes if r["impl"]["status"] == "parked"]
+    if parked:
+        detail += f"｜代码在归档、用前要取回：{', '.join(parked)}"
+    return _item("routes", "路线登记册", detect.GREEN, detail[:400])
+
+
 def check_port(m, own_ports=()):
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(0.4)
@@ -221,6 +248,7 @@ def run_all(base_dir, include_probe=True, own_ports=(), progress=None):
     items = [emit(check_registry(base_dir))]
     ms, _bad = _discover(base_dir)
     items.append(emit(check_hygiene(base_dir, ms)))
+    items.append(emit(check_routes(base_dir)))
     for m in ms:
         items.append(emit(check_command(m)))
         items.append(emit(check_port(m, own_ports)))

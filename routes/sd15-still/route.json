@@ -1,0 +1,115 @@
+{
+  "spec": 1,
+  "id": "sd15-still",
+  "name": "SD1.5 单张出图（4GB 卡主力路线）",
+  "kind": "image-route",
+  "notes": "4 GB 卡的主力线：--xformers + 无 medvram + 无 --no-half-vae。实测 512²/20步 ≈ 5.7 s、1024² ≈ 37.7 s、ADetailer 修脸 9.0 s、2048² 放大 284 s，全程不 OOM。SDXL 必配 SDXL VAE 且要带 --skip-install，832×1216/20步 = 440 s，只能当精修单张用。",
+  "inputs": [
+    {
+      "name": "prompt",
+      "type": "text",
+      "required": true,
+      "desc": "正向提示词。中文先进 core/i18n_tags 翻成 danbooru tag 再送模型"
+    },
+    {
+      "name": "negative",
+      "type": "text",
+      "required": false,
+      "default": "lowres, blurry, bad anatomy, watermark, text",
+      "desc": "反向提示词"
+    },
+    {
+      "name": "model",
+      "type": "path",
+      "required": false,
+      "desc": "底模文件名。不传则用已加载的那个（传子目录名会 404，别传目录）"
+    },
+    {
+      "name": "width",
+      "type": "int",
+      "required": false,
+      "default": 512,
+      "desc": "宽。512 是 4GB 卡的甜点，1024 起需要更久"
+    },
+    {
+      "name": "height",
+      "type": "int",
+      "required": false,
+      "default": 512,
+      "desc": "高"
+    },
+    {
+      "name": "steps",
+      "type": "int",
+      "required": false,
+      "default": 20,
+      "desc": "采样步数"
+    },
+    {
+      "name": "cfg",
+      "type": "number",
+      "required": false,
+      "default": 7,
+      "desc": "CFG scale"
+    },
+    {
+      "name": "seed",
+      "type": "int",
+      "required": false,
+      "default": -1,
+      "desc": "-1 = 随机；要复现就传具体值"
+    },
+    {
+      "name": "out_dir",
+      "type": "path",
+      "required": false,
+      "default": "{base}/work/images",
+      "desc": "出图目录"
+    }
+  ],
+  "outputs": [
+    {
+      "name": "images",
+      "type": "image",
+      "desc": "PNG（n_iter>1 时是一次一批；注意别用 n_iter 拼批，会多出 grid）"
+    }
+  ],
+  "needs": {
+    "vram_gb": 4,
+    "gpu": true,
+    "requires": ["backend/python", "backend/extensions", "models/Stable-diffusion"]
+  },
+  "steps": [
+    {
+      "tool": "sd_start",
+      "entry": "{base}/backend/launch.py",
+      "args": {
+        "api": true,
+        "xformers": true,
+        "skip_install": true,
+        "port": 7860
+      },
+      "desc": "起后端。实测 143 s 就绪；别用 MCP sd_start 的默认路径（指向已不存在的 E:/sd/...）"
+    },
+    {
+      "tool": "image_generate",
+      "entry": "bridge/server.mjs",
+      "args": {
+        "prompt": "{prompt}",
+        "negative_prompt": "{negative}",
+        "width": "{width}",
+        "height": "{height}",
+        "steps": "{steps}",
+        "cfg_scale": "{cfg}",
+        "seed": "{seed}"
+      },
+      "desc": "一次出图。返回文件路径，落 out_dir"
+    }
+  ],
+  "impl": {
+    "status": "active",
+    "path": "{base}/backend",
+    "entry": "launch.py",
+    "note": "现役。前端在 app/ui/image_app.py(:8899)；MCP 桥 18 个工具里 image_generate / image_edit / image_upscale / image_matting 都走这条线。"
+  }
+}
