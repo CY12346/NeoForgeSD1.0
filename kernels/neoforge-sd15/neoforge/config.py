@@ -8,7 +8,8 @@ import os
 HERE = os.path.dirname(os.path.abspath(__file__))        # .../neoforge-sd15/neoforge
 KERNEL = os.path.dirname(HERE)                           # .../neoforge-sd15
 UI_DIR = os.path.join(HERE, "ui")
-PAGE_FILE = os.path.join(UI_DIR, "image_page.html")
+WEB_DIR = os.path.join(UI_DIR, "web")
+PAGE_FILE = os.path.join(WEB_DIR, "index.html")
 
 
 def find_base(start=None):

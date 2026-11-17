@@ -106,7 +106,7 @@ def main():
     # 代码完整性：分层的每一层都得在。缺了就说明这个内核目录是半成品。
     missing = [p for p in ("config.py", "sdapi.py", "engine.py", "payload.py",
                            "jobs.py", "history.py", "textfmt.py", "server.py",
-                           "ui/image_page.html")
+                           "ui/web/index.html")
                if not os.path.isfile(os.path.join(PKG, p.replace("/", os.sep)))]
     if missing:
         die(3, "内核代码不完整，缺：%s。在仓库里跑 `python tools/build_kernel.py` 先构建"

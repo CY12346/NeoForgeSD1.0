@@ -1,0 +1,16 @@
+<!-- 浮层：补全下拉 / 轻提示 / 词库·风格面板（固定在 body 末尾，与页面容器分开） -->
+<div id="sug"></div>
+<div id="toast"><span id="toastMsg"></span></div>
+<div class="modal" id="libModal">
+  <div class="mbox">
+    <div class="mhead">
+      <h3 id="mTitle">提示词库</h3>
+      <input id="libQ" placeholder="搜索中文或英文 tag…" oninput="renderLib()">
+      <button class="mini" onclick="closeLib()">关闭</button>
+    </div>
+    <div class="mbody">
+      <div class="cats" id="libCats"></div>
+      <div class="liblist" id="libList"></div>
+    </div>
+  </div>
+</div>

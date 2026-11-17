@@ -1,0 +1,25 @@
+<!-- ③ 模型组：底模 / VAE / 采样默认 -->
+<main id="g-model" hidden>
+  <section class="card">
+    <h2>底模 / VAE <span>换引擎，不换内容</span></h2>
+    <label>底模（切换约 10–30 秒）</label>
+    <select id="model" onchange="setModel()"></select>
+    <label>VAE</label>
+    <select id="vae" onchange="setVae()"></select>
+    <label>CLIP skip（二次元常用 2）</label>
+    <div class="row">
+      <div><input id="clipSkip" type="number" min="1" max="12" value="1"></div>
+      <div><button class="ghost" onclick="applyClip()">应用</button></div>
+    </div>
+    <div class="msg" id="mModel"></div>
+  </section>
+  <section class="card">
+    <h2>采样默认 <span>文生图 / 图生图共用</span></h2>
+    <div class="row">
+      <div><label>采样器</label><select id="sampler"></select></div>
+      <div><label>调度器</label><select id="scheduler"></select></div>
+    </div>
+    <div class="note" id="modelInfo"></div>
+    <div class="note">本机 Forge 的采样器名不带 Karras —— Karras 是调度器。</div>
+  </section>
+</main>

@@ -1,8 +1,8 @@
 {
   "id": "neoforge-sd15",
   "version": "1.3.0",
-  "built_at": "2026-11-04T01:22:25",
-  "source_commit": "b99cf8f",
+  "built_at": "2026-11-17T23:26:09",
+  "source_commit": "3019abf",
   "files": [
     {
       "path": "README.md",
@@ -16,8 +16,8 @@
     },
     {
       "path": "kernel_main.py",
-      "size": 4869,
-      "sha256": "adc2ddefbf4b24b7e93a627642f35f5c1095f7c518f8fdee10586d965bdd02ed"
+      "size": 4868,
+      "sha256": "e9ac99fad23ac94f1fdd70386488c3d12a6a0527d90e1d8cbc99288d67ac0a0c"
     },
     {
       "path": "neoforge/__init__.py",
@@ -41,8 +41,8 @@
     },
     {
       "path": "neoforge/config.py",
-      "size": 2900,
-      "sha256": "9dee3955af041e44231e7b79e3282d0983f726424bec9ca04c8e969c15ead37c"
+      "size": 2934,
+      "sha256": "2750e6c07d3ff9f7510da9db21aeb9303304183c0672bc5092e92cdffda05aca"
     },
     {
       "path": "neoforge/engine.py",
@@ -71,8 +71,8 @@
     },
     {
       "path": "neoforge/server.py",
-      "size": 11755,
-      "sha256": "99f26cae2ce4a79aa44c5c8b79cf17fd0bd7a2127dfeaaa44a74f047a6827074"
+      "size": 12887,
+      "sha256": "67792a4e087cc5c3849ec58160f342325c545a7ffd1f21176472b89424f2d95e"
     },
     {
       "path": "neoforge/textfmt.py",
@@ -80,9 +80,114 @@
       "sha256": "5b720488164f4502d809e52e748f82e44d1512cf7bf07b360ba0762cb077a881"
     },
     {
-      "path": "neoforge/ui/image_page.html",
-      "size": 47864,
-      "sha256": "f4cdc7b4f9350a0310bb1c17c3a6ce71d8e2aa80f90674648d873b47bd190038"
+      "path": "neoforge/ui/web/css/base.css",
+      "size": 5697,
+      "sha256": "865c70f4d9e23b4f9c376da8a40477f971e38a8a9542cd53d3f2d6da46eb2731"
+    },
+    {
+      "path": "neoforge/ui/web/css/fx.css",
+      "size": 2379,
+      "sha256": "ec467122819473a4da5c3979fe33726ea642df243a26f3b7eb287b23c5bb3443"
+    },
+    {
+      "path": "neoforge/ui/web/css/prompt.css",
+      "size": 3535,
+      "sha256": "b0861aec332a771a40b76a4fcb507bcdf51b2b3e63d1fc5cadfcb55d2f705ae2"
+    },
+    {
+      "path": "neoforge/ui/web/index.html",
+      "size": 1489,
+      "sha256": "e746c1264273566111189dd9b8285d023a64a7c4a964883e1628ce65f958fa6f"
+    },
+    {
+      "path": "neoforge/ui/web/js/asset.js",
+      "size": 2838,
+      "sha256": "06b774844b6806fac426d1b6518c8827addab2a3384b53e0bbdec990e8ca2e67"
+    },
+    {
+      "path": "neoforge/ui/web/js/boot.js",
+      "size": 2944,
+      "sha256": "9145a6b34b16f6a32d5f7a4fcaf2786ffe63c9767baf1ea750dcfef83a48d772"
+    },
+    {
+      "path": "neoforge/ui/web/js/core.js",
+      "size": 8867,
+      "sha256": "f76bd0c0209b8fa64d350dca722e8eca6d30a846c7cd180ec937b6f9d1b6ca17"
+    },
+    {
+      "path": "neoforge/ui/web/js/img2img.js",
+      "size": 2610,
+      "sha256": "24e3ed7c3f93c006f7959e7838dce40fc8a29bdde33373df32b9557d6ec053b9"
+    },
+    {
+      "path": "neoforge/ui/web/js/inpaint.js",
+      "size": 3952,
+      "sha256": "011447ce3cbb808bc04aaf4fd065999b84ab98d5fc2159123b1844c7cbdc123a"
+    },
+    {
+      "path": "neoforge/ui/web/js/model.js",
+      "size": 1321,
+      "sha256": "64409244656d9586ed75491152a9ae38b21df8625b85ed19cf80578eb386c9b8"
+    },
+    {
+      "path": "neoforge/ui/web/js/prompt.js",
+      "size": 10861,
+      "sha256": "ff45aff54a94c012eb879edbc4578049700528a5029fb2093f4acebbbb673564"
+    },
+    {
+      "path": "neoforge/ui/web/js/txt2img.js",
+      "size": 1964,
+      "sha256": "dc7112903c620c3f0b2dba75bcd0e6479a2d2976144516f364efaaeb32e8e750"
+    },
+    {
+      "path": "neoforge/ui/web/js/upscale.js",
+      "size": 1606,
+      "sha256": "8abae78465579ae30b7f9ab00a6c62241fe2e9d79ed11884a62e7227df6d511b"
+    },
+    {
+      "path": "neoforge/ui/web/parts/group-asset.html",
+      "size": 1064,
+      "sha256": "20d1b137258d80e510571928f493f4682055b0ac69401c488c135fbe667a8ccd"
+    },
+    {
+      "path": "neoforge/ui/web/parts/group-create.html",
+      "size": 796,
+      "sha256": "304cbbbe4df8ed12bb98551487804fc8a186bbe26caca504c0b4be2ccd08d7bd"
+    },
+    {
+      "path": "neoforge/ui/web/parts/group-late.html",
+      "size": 1846,
+      "sha256": "d5cbbb58ec1b7c5f9f2a545fce7dde879ad404b6c6e94c7ee32ea53ea4dcd54d"
+    },
+    {
+      "path": "neoforge/ui/web/parts/group-model.html",
+      "size": 1082,
+      "sha256": "e4187414ddf92b769cc132da9b1592c426b9720e06b68052852deda6e9491e4c"
+    },
+    {
+      "path": "neoforge/ui/web/parts/overlays.html",
+      "size": 613,
+      "sha256": "40dbf535e77349b85263690b9fc7212b17e9852a18a40d23a6ad51194a4b4660"
+    },
+    {
+      "path": "neoforge/ui/web/parts/tab-advanced.html",
+      "size": 1548,
+      "sha256": "2b3e6a53009987db44297e289446eb62892e2bbe23763507e5d5a990a26fc839"
+    },
+    {
+      "path": "neoforge/ui/web/parts/tab-img2img.html",
+      "size": 2292,
+      "sha256": "3b51db6e08373336bf05622d3b1e66d17702e2b6c0a553b74df7b35bbc89f05d"
+    },
+    {
+      "path": "neoforge/ui/web/parts/tab-inpaint.html",
+      "size": 2099,
+      "sha256": "d191d54a2308f48ddb0ff46648a953e0dde91c27ea331558aeb577923bc90f48"
+    },
+    {
+      "path": "neoforge/ui/web/parts/tab-txt2img.html",
+      "size": 1999,
+      "sha256": "18724d9d8d36c0f1fe815720f654e50aeda13e2a72f9b138a8a851a431a3e124"
     }
   ]
 }

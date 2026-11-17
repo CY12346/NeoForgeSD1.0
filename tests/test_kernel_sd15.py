@@ -53,14 +53,32 @@ def main():
     # 内核里三件复制品是构建产物：源改了忘了重建，这里必须炸（否则两份代码悄悄岔开）
     import hashlib
     drift = []
-    for src, rel in (("ui/image_page.html", "neoforge/ui/image_page.html"),
-                     ("core/winproc.py", "neoforge/_vendor/winproc.py"),
+
+    def sha(p):
+        return hashlib.sha256(open(p, "rb").read()).hexdigest()
+
+    for src, rel in (("core/winproc.py", "neoforge/_vendor/winproc.py"),
                      ("core/i18n_tags.py", "neoforge/_vendor/i18n_tags.py")):
-        a = hashlib.sha256(open(os.path.join(APP, src), "rb").read()).hexdigest()
-        b = hashlib.sha256(open(os.path.join(KDIR, rel), "rb").read()).hexdigest()
-        if a != b:
+        if sha(os.path.join(APP, src)) != sha(os.path.join(KDIR, rel)):
             drift.append(rel)
-    check("复制品与源一致（没忘了 rebuild）", not drift, drift or "3 个文件 sha256 相同")
+
+    # 前端整棵树（拆分后是 web/ 目录，不只一个 html）
+    web_src = os.path.join(APP, "ui", "web")
+    web_dst = os.path.join(KDIR, "neoforge", "ui", "web")
+    src_files = {}
+    for dirpath, dirnames, files in os.walk(web_src):
+        dirnames[:] = [d for d in dirnames if d != "__pycache__"]
+        for name in files:
+            full = os.path.join(dirpath, name)
+            src_files[os.path.relpath(full, web_src).replace("\\", "/")] = full
+    for rel in sorted(src_files):
+        dst = os.path.join(web_dst, rel.replace("/", os.sep))
+        if not os.path.isfile(dst):
+            drift.append("neoforge/ui/web/" + rel + "（缺文件）")
+        elif sha(src_files[rel]) != sha(dst):
+            drift.append("neoforge/ui/web/" + rel)
+    check("复制品与源一致（没忘了 rebuild）", not drift,
+          drift or "%d 个前端文件 + 2 个 vendor 文件 sha256 相同" % len(src_files))
 
     print("=== ①b 分层：每层都在，且下层不 import 上层 ===")
     pkg = os.path.join(KDIR, "neoforge")
@@ -128,6 +146,20 @@ def main():
 
         code, page = grab("/")
         check("GET / 出页面", code == 200 and b"<html" in page.lower(), "%d / %d B" % (code, len(page)))
+        # 拆分后的前端是外链静态资源：任意一条 404，页面就只剩骨架
+        for path in ("/web/css/base.css", "/web/css/fx.css", "/web/css/prompt.css",
+                     "/web/js/boot.js", "/web/js/core.js", "/web/js/txt2img.js",
+                     "/web/js/img2img.js", "/web/js/inpaint.js", "/web/js/upscale.js",
+                     "/web/js/model.js", "/web/js/asset.js", "/web/js/prompt.js",
+                     "/web/parts/group-create.html", "/web/parts/tab-txt2img.html",
+                     "/web/parts/tab-img2img.html", "/web/parts/tab-inpaint.html",
+                     "/web/parts/tab-advanced.html", "/web/parts/group-late.html",
+                     "/web/parts/group-model.html", "/web/parts/group-asset.html",
+                     "/web/parts/overlays.html"):
+            code, body = grab(path)
+            check("GET %s" % path, code == 200 and len(body) > 100, "%d / %d B" % (code, len(body)))
+        code, _ = grab("/web/../kernel_main.py")
+        check("GET /web/../ 越界 → 404", code == 404, code)
         for path in ("/api/catalog", "/api/history", "/api/styles", "/api/progress",
                      "/api/i18n"):
             code, body = grab(path)

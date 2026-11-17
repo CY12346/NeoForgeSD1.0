@@ -1,0 +1,35 @@
+<!-- 创作 · 页签一：文生图（txt2img） -->
+<div id="paneT2I">
+  <label>提示词</label>
+  <textarea id="p1">masterpiece, best quality, 1girl, chibi, penguin hood, mint blue hair, blue eyes, standing in a cornfield, warm afternoon sunlight</textarea>
+  <label>反向词</label>
+  <input id="n1" value="lowres, worst quality, low quality, blurry, bad anatomy, bad hands, extra fingers, text, watermark">
+  <div class="row">
+    <div><label>尺寸预设</label><select id="preset" onchange="applyPreset()">
+      <option value="512x512" selected>512×512 原生（SD1.5 最佳，~6s）</option>
+      <option value="512x768">512×768 竖屏</option>
+      <option value="768x768">768×768（约 19s，易拉长）</option>
+      <option value="512x896">512×896 竖屏</option>
+      <option value="768x1344">768×1344 竖屏（~62s）</option>
+      <option value="832x1216">832×1216 SDXL 竖屏</option>
+      <option value="1216x832">1216×832 横屏</option>
+    </select></div>
+    <div class="row" style="gap:8px">
+      <div><label>宽</label><input id="w1" type="number" value="512"></div>
+      <div><label>高</label><input id="h1" type="number" value="512"></div>
+    </div>
+  </div>
+  <div class="row4">
+    <div><label>步数</label><input id="s1" type="number" value="20"></div>
+    <div><label>CFG</label><input id="c1" type="number" step="0.5" value="7"></div>
+    <div><label>张数</label><select id="nq"><option>1</option><option>2</option><option selected>4</option><option>8</option></select></div>
+    <div><label>种子（-1 随机）</label><input id="seed1" type="number" value="-1"></div>
+  </div>
+  <div class="act">
+    <button onclick="genImage()" id="btnImg">出图</button>
+    <button class="ghost" onclick="reuseSeed()" id="btnSeed">复用上个 seed</button>
+  </div>
+  <div class="bar"><i id="bar1"></i></div>
+  <div class="msg" id="m1"></div>
+  <div class="note">串行出图：4 张 = 跑 4 次，不改 batch_size，4G 卡不涨显存。</div>
+</div>

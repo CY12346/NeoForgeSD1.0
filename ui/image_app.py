@@ -471,13 +471,38 @@ class Handler(BaseHTTPRequestHandler):
     def _json(self, code, obj):
         self._send(code, json.dumps(obj, ensure_ascii=False))
 
+    # 前端静态资源的 Content-Type：必须带 charset，否则中文注释的 js/css 会被当 latin-1
+    EXT_CTYPE = {
+        ".css": "text/css; charset=utf-8",
+        ".js": "text/javascript; charset=utf-8",
+        ".mjs": "text/javascript; charset=utf-8",
+        ".html": "text/html; charset=utf-8",
+        ".json": "application/json; charset=utf-8",
+        ".svg": "image/svg+xml",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+    }
+
     def _file(self, p):
         if not os.path.isfile(p):
             self._json(404, {"error": "no file"})
             return
-        ctype = mimetypes.guess_type(p)[0] or "application/octet-stream"
+        ext = os.path.splitext(p)[1].lower()
+        ctype = self.EXT_CTYPE.get(ext) or mimetypes.guess_type(p)[0] or "application/octet-stream"
         with open(p, "rb") as f:
             self._send(200, f.read(), ctype)
+
+    def _static(self, rel):
+        """只放行 web/ 目录内的文件；../ 一律落到 404，不给越界机会。"""
+        name = urllib.request.unquote(rel).split("?")[0]
+        p = os.path.normpath(os.path.join(WEB_DIR, name.replace("/", os.sep)))
+        if not p.startswith(WEB_DIR + os.sep) or not os.path.isfile(p):
+            self._json(404, {"error": "no file"})
+            return
+        self._file(p)
 
     def do_GET(self):
         if self.path.split("?")[0] in ("/", "/index.html"):
@@ -485,6 +510,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path.startswith("/api/status"):
             self._json(200, sd_status())
+            return
+        if self.path.startswith("/web/"):          # 前端静态资源：html 片段 / css / js
+            self._static(self.path[5:])
             return
         if self.path.startswith("/api/catalog"):
             self._json(200, sd_catalog(force="force" in self.path))
@@ -706,7 +734,9 @@ class Handler(BaseHTTPRequestHandler):
         self._json(404, {"error": "not found"})
 
 
-PAGE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "image_page.html")
+UI_DIR = os.path.dirname(os.path.abspath(__file__))
+WEB_DIR = os.path.join(UI_DIR, "web")
+PAGE_FILE = os.path.join(WEB_DIR, "index.html")
 
 
 def load_page():

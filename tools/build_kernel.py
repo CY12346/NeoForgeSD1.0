@@ -23,15 +23,19 @@ KERNEL_DIR = os.path.join(ROOT, "kernels", "neoforge-sd15")
 PKG = os.path.join(KERNEL_DIR, "neoforge")
 DIST = os.path.join(ROOT, "dist", "kernels")
 
-# (仓库内源文件, 内核内相对路径) —— 只有这三件是复制品
+# (仓库内源路径, 内核内相对路径) —— 复制品清单。目录会整体镜像（先删后拷，源里删了文件不会残留）
 STAGED = [
-    ("ui/image_page.html", "neoforge/ui/image_page.html"),
+    ("ui/web", "neoforge/ui/web"),
     ("core/winproc.py", "neoforge/_vendor/winproc.py"),
     ("core/i18n_tags.py", "neoforge/_vendor/i18n_tags.py"),
 ]
 
 # 旧布局（image_app.py 单体 + app/ 副本）的遗留目录，构建时清掉
 LEGACY = ["app"]
+
+# 拆分前的前端单体，构建时从内核里删掉（源已归档到 ui/_parked/）
+LEGACY_FILES = [os.path.join("neoforge", "ui", "image_page.html")]
+
 
 SKIP_IN_MANIFEST = ("manifest.json", ".buildinfo.json")
 
@@ -81,16 +85,37 @@ def build():
             shutil.rmtree(p)
             print("  清掉旧布局：%s/" % legacy)
 
+    for rel in LEGACY_FILES:
+        p = os.path.join(KERNEL_DIR, rel)
+        if os.path.isfile(p):
+            os.remove(p)
+            print("  清掉旧前端单体：%s" % rel.replace(os.sep, "/"))
+
     total = 0
+    staged_files = 0
     for src, rel in STAGED:
         s = os.path.join(ROOT, src)
-        if not os.path.isfile(s):
+        d = os.path.join(KERNEL_DIR, rel)
+        if os.path.isdir(s):
+            if os.path.isdir(d):
+                shutil.rmtree(d)            # 镜像：内核里的旧副本整删，免得源删了文件还留着
+            for dirpath, dirnames, filenames in os.walk(s):
+                dirnames[:] = [x for x in dirnames if x != "__pycache__"]
+                for name in filenames:
+                    sf = os.path.join(dirpath, name)
+                    rf = os.path.join(d, os.path.relpath(sf, s))
+                    os.makedirs(os.path.dirname(rf), exist_ok=True)
+                    shutil.copy2(sf, rf)
+                    total += os.path.getsize(rf)
+                    staged_files += 1
+        elif os.path.isfile(s):
+            os.makedirs(os.path.dirname(d), exist_ok=True)
+            shutil.copy2(s, d)
+            total += os.path.getsize(d)
+            staged_files += 1
+        else:
             print("✗ 源文件缺失：%s" % s)
             return 2
-        d = os.path.join(KERNEL_DIR, rel)
-        os.makedirs(os.path.dirname(d), exist_ok=True)
-        shutil.copy2(s, d)
-        total += os.path.getsize(d)
 
     for dirpath, dirnames, _f in os.walk(KERNEL_DIR):
         for dn in list(dirnames):
@@ -120,7 +145,7 @@ def build():
 
     py = [f for f in files if f["path"].endswith(".py")]
     print("内核目录：%s" % KERNEL_DIR)
-    print("  stage 的复制品 %d 个 / %s（源在仓库 ui/、core/）" % (len(STAGED), human(total)))
+    print("  stage 的复制品 %d 个文件 / %s（源在仓库 ui/web、core/）" % (staged_files, human(total)))
     print("  手写源码：%d 个 .py（neoforge/ 分层 + kernel_main.py）" % len(py))
     print("  包内文件 %d 个 / %s" % (len(files), human(sum(f["size"] for f in files))))
     print("分发包：%s" % zpath)

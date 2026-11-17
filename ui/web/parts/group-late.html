@@ -1,0 +1,31 @@
+<!-- ② 后期组：放大 / 修脸 -->
+<main id="g-late" hidden>
+  <section class="card">
+    <h2>放大 / 修脸 <span>extras · 只提分辨率与修复，不改内容</span></h2>
+    <div class="row">
+      <div><label>源图</label><input id="fUp" type="file" accept="image/*" onchange="pickUp(this)"></div>
+      <div><label>或</label><div class="note" style="margin-top:6px"><span class="chip" onclick="upFromCanvas()">用画布这张</span></div></div>
+    </div>
+    <div class="row">
+      <div><label>放大模型</label><select id="ups"></select></div>
+      <div><label>倍数</label><select id="scale"><option>2</option><option selected>2</option><option>3</option><option>4</option></select></div>
+    </div>
+    <div class="row">
+      <div><label>GFPGAN 修脸（0–1）</label><input id="gfpgan" type="number" step="0.1" value="0"></div>
+      <div><label>CodeFormer 修脸（0–1）</label><input id="codeformer" type="number" step="0.1" value="0"></div>
+    </div>
+    <div class="act"><button onclick="doUpscale()" id="btnUp">放大</button></div>
+    <div class="bar"><i id="bar3"></i></div>
+    <div class="msg" id="m3"></div>
+    <div class="note">4x-AnimeSharp 二次元 / 4x-UltraSharp 通用 / DAT 保细节。修脸值 >0 才会跑 GFPGAN/CodeFormer（慢）。</div>
+  </section>
+  <section class="card">
+    <h2>怎么选 <span>经验值</span></h2>
+    <div class="note">
+      · <b>只是想变大</b>：放大 2× + 4x-AnimeSharp，最快。<br>
+      · <b>脸糊</b>：先回创作页开 ADetailer 重出；已经出好的图就用 GFPGAN 0.3–0.5 补。<br>
+      · <b>手崩</b>：局部重绘涂手 + <code>correct hands</code>，或用 ADetailer 换 <code>hand_yolov8n.pt</code>。<br>
+      · <b>要 4K 壁纸</b>：放大 4× + DAT x4，再局部重绘修细节。
+    </div>
+  </section>
+</main>

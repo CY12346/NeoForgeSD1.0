@@ -1,0 +1,34 @@
+<!-- 创作 · 页签三：局部重绘（inpaint） -->
+<div id="paneINP" hidden>
+  <div class="row">
+    <div><label>源图</label><input id="fIp" type="file" accept="image/*" onchange="pickIp(this)"></div>
+    <div><label>或</label><div class="note" style="margin-top:6px"><span class="chip" onclick="ipFromCanvas()">用画布这张</span></div></div>
+  </div>
+  <div class="note" id="ipNote">还没载入图片。载入后用鼠标/手指在图上涂抹要重绘的区域（红色为蒙版）。</div>
+  <div class="ipwrap" id="ipwrap" hidden>
+    <canvas id="ipBase"></canvas>
+    <canvas id="ipMask" class="ipmask"></canvas>
+  </div>
+  <div class="row3">
+    <div><label>笔刷大小</label><input id="brush" type="range" min="4" max="160" step="2" value="40"></div>
+    <div><label>蒙版羽化</label><input id="maskBlur" type="number" value="4"></div>
+    <div><label>遮罩底</label><select id="inpaintFill"><option value="1" selected>原图内容</option><option value="0">填充</option><option value="2">潜空间噪声</option></select></div>
+  </div>
+  <div class="row3">
+    <div><label>denoise</label><input id="dnIp" type="number" step="0.05" value="0.6"></div>
+    <div><label>步数</label><input id="sIp" type="number" value="20"></div>
+    <div><label>CFG</label><input id="cIp" type="number" step="0.5" value="7"></div>
+  </div>
+  <div class="row">
+    <div><label>提示词（只描述要重绘成什么）</label><input id="pIp" value="detailed eyes, correct hands"></div>
+    <div><label>张数</label><select id="nqIp"><option>1</option><option>2</option><option selected>4</option></select></div>
+  </div>
+  <input id="nIp" type="hidden" value="lowres, worst quality, blurry, bad anatomy, extra fingers">
+  <div class="act">
+    <button onclick="doInpaint()" id="btnInp">局部重绘</button>
+    <button class="ghost" onclick="clearMask()">清空蒙版</button>
+  </div>
+  <div class="bar"><i id="bar4"></i></div>
+  <div class="msg" id="m4"></div>
+  <div class="note">只重绘涂过的区域；「原图内容」最稳，改脸改手先试 0.55–0.7。</div>
+</div>

@@ -12,7 +12,7 @@
 | `kernel.json` | 手写 | 契约。壳唯一读的东西：命令、端口、健康检查、出图目录、需要什么 |
 | `kernel_main.py` | 手写 | 入口。查环境 → 打 `PIPE:` 行 → 起 `neoforge.server` |
 | `neoforge/` | 手写（8 层） | `config → sdapi → {engine, payload, jobs, history, textfmt} → server` |
-| `neoforge/ui/image_page.html` | **构建复制** | 源在仓库 `ui/image_page.html` |
+| `neoforge/ui/web/` | **构建复制** | 源在仓库 `ui/web/`（整棵树镜像：index.html + css/ + js/ + parts/） |
 | `neoforge/_vendor/{winproc,i18n_tags}.py` | **构建复制** | 源在仓库 `core/` |
 | `manifest.json` | 构建产物 | 每个文件的 size + sha256，用于分发校验 |
 

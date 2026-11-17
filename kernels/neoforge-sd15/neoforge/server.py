@@ -48,6 +48,20 @@ def load_page():
 class Handler(BaseHTTPRequestHandler):
     server_version = "NeoForgeImage/1.3"
 
+    # 前端静态资源：必须带 charset，否则中文注释的 js/css 会被当 latin-1
+    EXT_CTYPE = {
+        ".css": "text/css; charset=utf-8",
+        ".js": "text/javascript; charset=utf-8",
+        ".html": "text/html; charset=utf-8",
+        ".json": "application/json; charset=utf-8",
+        ".svg": "image/svg+xml",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+    }
+
     def log_message(self, fmt, *args):      # 静音：日志由调用方决定去哪
         pass
 
@@ -72,9 +86,20 @@ class Handler(BaseHTTPRequestHandler):
         if not os.path.isfile(p):
             self._json(404, {"error": "no file"})
             return
-        ctype = mimetypes.guess_type(p)[0] or "application/octet-stream"
+        ext = os.path.splitext(p)[1].lower()
+        ctype = self.EXT_CTYPE.get(ext) or mimetypes.guess_type(p)[0] or "application/octet-stream"
         with open(p, "rb") as f:
             self._send(200, f.read(), ctype)
+
+    def _static(self, rel):
+        """只放行 ui/web/ 内的前端资源；../ 一律 404。"""
+        name = urllib.parse.unquote(rel).split("?")[0]
+        root = config.WEB_DIR
+        p = os.path.normpath(os.path.join(root, name.replace("/", os.sep)))
+        if not p.startswith(root + os.sep) or not os.path.isfile(p):
+            self._json(404, {"error": "no file"})
+            return
+        self._file(p)
 
     def _need_dict(self):
         """词典不可用时统一的 503 人话。"""
@@ -87,6 +112,9 @@ class Handler(BaseHTTPRequestHandler):
 
         if path in ("/", "/index.html"):
             self._send(200, load_page().encode("utf-8"), "text/html; charset=utf-8")
+            return
+        if path.startswith("/web/"):            # 前端静态资源：html 片段 / css / js
+            self._static(path[5:])
             return
         if self.path.startswith("/api/status"):
             self._json(200, status())

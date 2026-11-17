@@ -9,7 +9,7 @@
 
 | | 核（本目录） | 壳（`NeoForgeSD.exe`） |
 |---|---|---|
-| 代码 | `app/ui/image_app.py`（730 行）、`image_page.html`、`app/core/{winproc,i18n_tags}.py` | 启动器界面、内核登记册、管道、维修、打包、下载 |
+| 代码 | `app/ui/image_app.py`（739 行）、`ui/web/`（拆分后的前端：外壳 + 3 个 css + 9 个 js + 9 个 html 片段）、`app/core/{winproc,i18n_tags}.py` | 启动器界面、内核登记册、管道、维修、打包、下载 |
 | 干的活 | 出图前端（8899）+ 拉起 SD 后端（7860）+ 提示词中⇄英 + 历史/放大/重绘 | 起核、判活、收进度、收尸、亮状态灯、装包/下载 |
 | 不知道什么 | 不懂启动器、不读 `work/setup.json` | 不认识 A1111、不认识 ComfyUI、不碰 `webui.py` |
 | 重量 | **包 8 个文件 105 KiB（zip 37 KiB）** | exe 12.5 MB |
@@ -36,7 +36,7 @@ kernels/neoforge-sd15/
     ├── history.py           历史（work/history_image.json，原子写）
     ├── textfmt.py           中⇄英 / 补全 / 词库（包装 _vendor/i18n_tags）
     ├── server.py            HTTP 路由（唯一对外的层）
-    ├── ui/image_page.html   ← 构建复制（源在仓库 ui/）
+    ├── ui/web/              ← 构建复制（源在仓库 ui/web/：外壳 + css/ + js/ + parts/）
     └── _vendor/             ← 构建复制（源在仓库 core/）：winproc / i18n_tags
 ```
 

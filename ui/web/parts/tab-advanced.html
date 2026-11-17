@@ -1,0 +1,20 @@
+<!-- 创作 · 折叠区：面部修复 / LoRA / 高清修复（文生图与图生图共用） -->
+<details style="margin-top:12px;border:1px solid var(--line);border-radius:10px;padding:0 12px;background:#141821">
+  <summary style="cursor:pointer;padding:10px 0;font-weight:600">高级：面部修复 · LoRA · 高清修复</summary>
+  <label><input type="checkbox" id="adOn" checked>面部修复 ADetailer（崩脸/小脸必开）</label>
+  <div class="row3">
+    <div><label>检测阈值</label><input id="adConf" type="number" step="0.05" value="0.3"></div>
+    <div><label>重绘幅度</label><input id="adDn" type="number" step="0.05" value="0.4"></div>
+    <div><label>检测模型</label><input id="adModel" value="face_yolov8n.pt"></div>
+  </div>
+  <div class="note">想修手可把模型换成 <code>hand_yolov8n.pt</code>（首次用需要能联网自动下载）。</div>
+  <label style="margin-top:12px">LoRA（Ctrl/Shift 多选）</label>
+  <select id="loraSel" multiple size="5"></select>
+  <label>LoRA 权重</label><input id="loraW" type="number" step="0.05" value="0.8">
+  <label style="margin-top:12px"><input type="checkbox" id="hrOn">启用高清修复（仅文生图；会再跑一遍采样）</label>
+  <div class="row3">
+    <div><label>倍率</label><select id="hrScale"><option>1.5</option><option selected>2</option></select></div>
+    <div><label>重绘幅度</label><input id="hrDn" type="number" step="0.05" value="0.4"></div>
+    <div><label>放大算法</label><select id="hrUp"></select></div>
+  </div>
+</details>

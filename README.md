@@ -92,7 +92,7 @@ python manhua.py --shots shots.json --backend comfy --out out_dir --limit 10
 |---|---|---|
 | 双后端客户端 | `core/comfy_client.py` `core/sdclient.py` | 封装 ComfyUI(`:8188`) 与 NeoForge WebUI(`:7860`) 的 HTTP API，把实测踩过的坑固化进去 |
 | 出图调度器 | `manhua.py` | 场景清单 → 批量出图 → 命名落盘 + manifest.json |
-| 图形页面 | `ui/image_app.py` `ui/image_page.html` | ①创作 ②后期 ③模型 ④资产 四组；提示词助手（中⇄英 / 词库 / 补全 / 风格）；自动以 `--nowebui` 拉起 SD 后端 |
+| 图形页面 | `ui/image_app.py` `ui/web/` | ①创作 ②后期 ③模型 ④资产 四组；提示词助手（中⇄英 / 词库 / 补全 / 风格）；自动以 `--nowebui` 拉起 SD 后端 |
 | 提示词助手 | `core/i18n_tags.py` | 读本机 SD 扩展的 danbooru 中英词典 + 词组库；纯标准库，无 GPU 无网络也能跑 |
 | MCP 桥 | `bridge/` | 把本机 AIGC 能力（SD 出图 / ComfyUI / 语音）暴露成 MCP 工具给 AI Agent |
 
@@ -183,7 +183,7 @@ node server.mjs   # 走 stdio JSON-RPC，由 MCP 客户端拉起
 
 小抄：页面里 `文生图 / 图生图` 两个页签；想直接落到图生图就开 `http://127.0.0.1:8899/?mode=i2i`。
 
-**生图（`ui/image_app.py` + `ui/image_page.html`，8899，独立前端）** —— 把 SD 里能通过 API 做的功能全搬过来，按 **4 组** 摆：
+**生图（`ui/image_app.py` + `ui/web/`，8899，独立前端）** —— 把 SD 里能通过 API 做的功能全搬过来，按 **4 组** 摆：
 
 | 组 | 里面有什么 | 对应 SD |
 |---|---|---|

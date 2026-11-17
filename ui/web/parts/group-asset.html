@@ -1,0 +1,18 @@
+<!-- ④ 资产组：历史 / PNG 信息 -->
+<main id="g-asset" hidden>
+  <section class="card">
+    <h2>历史 <span>点图回填参数；<span class="chip" onclick="reuseParams()">复用最后一张参数</span></span></h2>
+    <div class="grid" id="hist"><div class="ph">暂无历史</div></div>
+  </section>
+  <section class="card">
+    <h2>PNG 信息 <span>从图里读参数（WebUI 的 PNG Info）</span></h2>
+    <div class="row">
+      <div><label>图片</label><input id="fInfo" type="file" accept="image/png,image/jpeg" onchange="pickInfo(this)"></div>
+      <div><label>或</label><div class="note" style="margin-top:6px"><span class="chip" onclick="infoFromCanvas()">用画布这张</span></div></div>
+    </div>
+    <div class="act"><button class="ghost" onclick="readInfo()" id="btnInfo">读参数</button></div>
+    <pre id="infoBox">（选一张出图，点「读参数」）</pre>
+    <div class="act"><button class="ghost" onclick="applyInfo()">回填到文生图表单</button></div>
+    <div class="msg" id="mInfo"></div>
+  </section>
+</main>

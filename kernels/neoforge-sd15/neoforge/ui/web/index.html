@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeoForgeSD · 生图</title>
+<!-- 样式全部外链：结构 base / 特效 fx / 提示词助手 prompt -->
+<link rel="stylesheet" href="/web/css/base.css">
+<link rel="stylesheet" href="/web/css/fx.css">
+<link rel="stylesheet" href="/web/css/prompt.css">
+</head>
+<body>
+
+<header>
+  <div class="logo">NeoForge<i>SD</i><b>生图</b></div>
+  <div class="mono" id="stat"><span class="dot"></span>连接中…</div>
+  <div style="flex:1"></div>
+  <button class="ghost" onclick="startSD()" id="btnStart">启动后端</button>
+  <button class="ghost" onclick="stopSD()" id="btnStop" style="display:none">停止后端</button>
+  <button class="ghost" onclick="openFolder()">打开产物目录</button>
+  <button class="ghost" onclick="loadStatus(true)">刷新</button>
+</header>
+
+<div class="groupbar">
+  <button class="g on" id="gbtn-create" onclick="showG('create')">① 创作</button>
+  <button class="g" id="gbtn-late" onclick="showG('late')">② 后期</button>
+  <button class="g" id="gbtn-model" onclick="showG('model')">③ 模型</button>
+  <button class="g" id="gbtn-asset" onclick="showG('asset')">④ 资产</button>
+</div>
+
+<!-- 四组页面由 boot.js 从 parts/ 逐个注入：#views 放骨架，#overlays 放浮层 -->
+<div id="views"></div>
+<div id="overlays"></div>
+
+<script type="module" src="/web/js/boot.js"></script>
+</body>
+</html>

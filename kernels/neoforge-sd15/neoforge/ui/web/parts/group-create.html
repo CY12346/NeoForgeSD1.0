@@ -1,0 +1,19 @@
+<!-- ① 创作组：外壳 + 画布。三个页签的表单在 tab-*.html，高级选项在 tab-advanced.html -->
+<main id="g-create">
+  <section class="card">
+    <h2>生图 <span id="modeHint">文生图 txt2img</span></h2>
+    <div class="tabs2">
+      <button class="on" id="tbT2I" onclick="mode('t2i')">文生图</button>
+      <button id="tbI2I" onclick="mode('i2i')">图生图</button>
+      <button id="tbINP" onclick="mode('inp')">局部重绘</button>
+    </div>
+    <div id="panes"></div>
+    <div id="adv"></div>
+  </section>
+
+  <section class="card">
+    <h2>画布 <span>点历史/结果缩略图可换图；后期与局部重绘都能拿这张当源图</span></h2>
+    <div class="stage" id="stage">还没有产物</div>
+    <div class="note" id="info"></div>
+  </section>
+</main>

@@ -35,7 +35,7 @@
 │                    config.py   路径/端口/开关/基准目录推导（无依赖，纯读环境）                        │
 │                                                                                                     │
 │   _vendor/{winproc,i18n_tags}.py   第三方小件（构建时复制，sha256 守着）                             │
-│   ui/image_page.html              前端页面（构建时复制）                                             │
+│   ui/web/                         前端（index.html / css/ / js/ / parts/，构建时复制）              │
 └───────────────────────────────────────┬─────────────────────────────────────────────────────────────┘
                                         │ HTTP 127.0.0.1:7860（--nowebui）
                              ┌──────────▼──────────┐
@@ -106,7 +106,7 @@
 |---|---|---|
 | 接 ComfyUI / 自研后端 | `engine.py`（启动参数、进程管理）+ `sdapi.py`（路径与方言） | `server.py` / `jobs.py` / 前端 / 壳 |
 | 加一个新接口 | `server.py` 加一条路由 + 需要的话在下层加一个函数 | 壳、kernel.json |
-| 换前端页面 | 改仓库 `ui/image_page.html` → `build_kernel.py` 重新 stage | Python 全不动 |
+| 换前端页面 | 改仓库 `ui/web/`（index.html / css/ / js/ / parts/）→ `build_kernel.py` 重新 stage | Python 全不动 |
 | 换壳（别的启动器） | 不用改 | 只要它认 spec v1 |
 | 换模型/权重目录 | 环境变量 `NEOFORGE_SD_HOME` | 代码全不动 |
 | 调 4 GB 卡参数 | `engine.SD_ARGS`（或用 `NEOFORGE_SD_MEDVRAM/SAFE_VAE/TOME` 开关） | 其它层 |
@@ -129,7 +129,7 @@
 | 类别 | 例子 | 谁改 | 进不进 git |
 |---|---|---|---|
 | 手写源码 | `neoforge/*.py`、`kernel_main.py`、`kernel.json` | 人 | 进 |
-| 复制品（构建 stage） | `neoforge/ui/image_page.html`、`neoforge/_vendor/{winproc,i18n_tags}.py` | `tools/build_kernel.py` | 进（带 sha256 守卫，防岔开） |
+| 复制品（构建 stage） | `neoforge/ui/web/`（整棵树）、`neoforge/_vendor/{winproc,i18n_tags}.py` | `tools/build_kernel.py` | 进（带 sha256 守卫，防岔开） |
 | 构建产物 | `manifest.json`、`dist/kernels/*.zip` | 构建脚本 | manifest 进，zip 不进（dist 已 ignore） |
 
 ---

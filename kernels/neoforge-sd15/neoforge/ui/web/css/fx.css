@@ -1,0 +1,53 @@
+/* =====================================================================
+   NeoForgeSD 生图前端 · 特效层
+   所有会"动"的东西都在这：发光、渐变、过渡、关键帧、按下/悬停反馈。
+   JS 只负责改数据（进度宽度、下拉位置），不负责写这些效果。
+   ===================================================================== */
+
+/* 过渡：颜色/边框变化一律 0.18s，别在 base.css 里重复写 */
+button,.g,.tabs2 button,.chip,.grid img,input,textarea,select{
+  transition:background-color .18s ease, border-color .18s ease,
+             color .18s ease, box-shadow .18s ease, transform .12s ease;
+}
+
+/* ---------- 状态灯：在线呼吸 ---------- */
+.dot.on{background:var(--acc); box-shadow:0 0 8px var(--acc); animation:breathe 2.4s ease-in-out infinite}
+.dot.off{background:var(--bad); box-shadow:0 0 6px #f8717188}
+
+/* ---------- 进度条：渐变填充 ---------- */
+.bar>i{background:linear-gradient(90deg,var(--acc2),var(--acc)); transition:width .3s ease}
+
+/* ---------- 按钮反馈 ---------- */
+button:hover:not(:disabled){filter:brightness(1.08); box-shadow:0 0 0 1px #38bdf855}
+button:active:not(:disabled){transform:translateY(1px)}
+button.ghost:hover:not(:disabled){border-color:var(--acc2); color:var(--acc2)}
+.g:hover{border-color:var(--acc2); color:var(--fg)}
+.g.on:hover{color:#04121b}
+input:focus,textarea:focus,select:focus{box-shadow:0 0 0 3px #38bdf81f}
+.chip:hover{border-color:var(--acc2); color:var(--fg)}
+.grid img:hover{border-color:var(--acc2); transform:scale(1.02)}
+
+/* ---------- 浮层入场 ---------- */
+#toast.on{animation:toastUp .22s ease-out}
+.modal.on{animation:fadeIn .16s ease-out}
+.modal.on .mbox{animation:zoomIn .18s cubic-bezier(.2,.9,.3,1.2)}
+
+/* ---------- 关键帧 ---------- */
+@keyframes breathe{
+  0%,100%{box-shadow:0 0 6px var(--acc); opacity:1}
+  50%    {box-shadow:0 0 14px var(--acc); opacity:.75}
+}
+@keyframes toastUp{
+  from{opacity:0; transform:translate(-50%,14px)}
+  to  {opacity:1; transform:translate(-50%,0)}
+}
+@keyframes fadeIn{from{opacity:0} to{opacity:1}}
+@keyframes zoomIn{
+  from{opacity:0; transform:translateY(10px) scale(.97)}
+  to  {opacity:1; transform:translateY(0) scale(1)}
+}
+
+/* 尊重系统设置：要减少动态效果就全关 */
+@media(prefers-reduced-motion:reduce){
+  *{animation:none !important; transition:none !important}
+}
