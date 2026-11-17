@@ -3,20 +3,20 @@
   "id": "puppet",
   "name": "立绘木偶（形变场驱动）",
   "kind": "video-route",
-  "notes": "用户指定的路线：单张立绘 + 形变场关键帧 → 动作由参数曲线决定，天然连贯、零显存。为什么不用 AnimateDiff 出剧本动作：实测 i2v 512² 只能给「呼吸级微动」，denoise≥0.6 掉身份、≤0.5 几乎不动，24 帧后段还糊。所以木偶与 AnimateDiff 不是备选关系——一个零显存可长片，一个吃显存只配氛围微动。",
+  "notes": "用户指定的路线：单张立绘 + 形变场关键帧 → 动作由参数曲线决定，天然连贯、零显存。为什么不用 AnimateDiff 出剧本动作：实测 i2v 512² 只能给「呼吸级微动」，denoise≥0.6 掉身份、≤0.5 几乎不动，24 帧后段还糊。所以木偶与 AnimateDiff 不是备选关系——一个零显存可长片，一个吃显存只配氛围微动。｜能力边界（2026-11-17 实测）：形变场只能对整张立绘做局部拉伸，造不出画面里没有的肢体。现有 6 张素材全是半身/胸像、手臂大半被裁，跑 wave 质检 COHERENT 但挥手动作很弱（subject_travel 808 px 主要是整体位移）。要出剧本级动作（抬手/招手/跳），需要可动立绘：分层素材（头/躯干/上臂/前臂分开），或全身立绘。",
   "inputs": [
     {
       "name": "sprite",
       "type": "image",
       "required": true,
-      "desc": "单张立绘，建议透明背景 PNG（人物统一性靠复用同一张立绘保证）"
+      "desc": "单张立绘（白底或透明底）。人物统一性靠复用同一张立绘保证；动作幅度受立绘裁切范围限制"
     },
     {
       "name": "action",
       "type": "enum",
       "required": true,
       "options": ["idle", "wave", "raise", "nod", "jump", "reach", "punch", "bow"],
-      "desc": "动作名。另有外部注册入口 core.traj 的 register_action()，内置 8 个模板不受影响"
+      "desc": "动作名。另有外部注册入口 core_video.traj 的 register_action()，内置 8 个模板不受影响"
     },
     {
       "name": "dur",
@@ -33,11 +33,25 @@
       "desc": "帧率"
     },
     {
+      "name": "size",
+      "type": "text",
+      "required": false,
+      "default": "720x720",
+      "desc": "画布尺寸 WxH。竖版立绘建议 720x1080，别用方形硬裁"
+    },
+    {
       "name": "out",
       "type": "path",
       "required": false,
       "default": "{base}/work/video/{action}_{dur}s.mp4",
       "desc": "成片路径。默认落在 work/video/，别再往 work 根丢"
+    },
+    {
+      "name": "metrics",
+      "type": "bool",
+      "required": false,
+      "default": true,
+      "desc": "出片后跑连贯性体检（quality.py），返回 verdict"
     }
   ],
   "outputs": [
@@ -49,7 +63,7 @@
     {
       "name": "qa",
       "type": "text",
-      "desc": "质检报告（quality.py 产出的逐帧指标，可选步骤）"
+      "desc": "质检 JSON（diff_subject / active_frac / max_jerk / flicker_pct / verdict）"
     }
   ],
   "needs": {
@@ -66,22 +80,24 @@
         "action": "{action}",
         "dur": "{dur}",
         "fps": "{fps}",
-        "out": "{out}"
+        "size": "{size}",
+        "out": "{out}",
+        "metrics": "{metrics}"
       },
-      "desc": "形变场动作引擎：按参数曲线生成每一帧 → ffmpeg 编码"
+      "desc": "形变场动作引擎：按参数曲线生成每一帧 → ffmpeg 编码。跑法 python -m core_video.motion（直接 python core_video/motion.py 也行，相对导入有兜底）"
     },
     {
       "tool": "quality",
       "entry": "{impl}/quality.py",
       "optional": true,
-      "desc": "逐帧质检（清晰度/帧间抖动），出片后回看用"
+      "desc": "逐帧质检（清晰度/帧间抖动/重复帧/闪烁），出片后回看用；verdict 只有 COHERENT / 不合格两种"
     }
   ],
   "impl": {
-    "status": "parked",
-    "path": "D:/AIGC/archive/2026-10/video-parked/parked_video/core_video",
+    "status": "active",
+    "path": "{base}/app/core_video",
     "entry": "motion.py",
-    "lines": 1033,
-    "note": "motion.py 403 + traj.py 459 + quality.py 164 + __init__.py 7。视频线 2026-10 整体归档，当前 app/core 里没有这几个文件；要用先取回。依赖只有 numpy + Pillow + ffmpeg，无 torch。"
+    "lines": 1035,
+    "note": "2026-11-17 从 D:/AIGC/archive/2026-10/video-parked/parked_video/core_video 取回到 app/core_video/，已跑通 wave/nod。依赖 numpy + Pillow + ffmpeg（quality.FFMPEG 自动探测环境变量 FFMPEG、PATH、以及 E:/LosslessCut/resources/ffmpeg.exe）。归档原件保留不动。"
   }
 }

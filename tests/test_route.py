@@ -17,8 +17,11 @@ CASES = [
     ("槽位缺 type", lambda r: r["inputs"][0].pop("type")),
     ("type 不在白名单", lambda r: r["inputs"][0].__setitem__("type", "hologram")),
     ("steps 为空", lambda r: r.__setitem__("steps", [])),
-    ("parked 但没有 path", lambda r: r["impl"].pop("path")),
-    ("enum 没 options", lambda r: r["inputs"][1].pop("options")),
+    # 不能依赖样本当前恰好是 parked：显式改成 parked 再拿掉 path
+    ("parked 但没有 path", lambda r: (r["impl"].__setitem__("status", "parked"),
+                                     r["impl"].pop("path", None))),
+    ("status 不在白名单", lambda r: r["impl"].__setitem__("status", "someday")),
+    ("enum 没 options", lambda r: next(x for x in r["inputs"] if x["type"] == "enum").pop("options")),
     ("vram 是负数", lambda r: r["needs"].__setitem__("vram_gb", -1)),
     ("outputs 为空", lambda r: r.__setitem__("outputs", [])),
 ]
@@ -41,6 +44,17 @@ def main():
             if not entry or not os.path.isabs(entry):
                 continue
             assert os.path.exists(entry), f"{r['id']}/{st['tool']} 的 entry 不存在：{entry}"
+
+    # status=active 的路线，impl.path 必须真实存在；parked 必须给 path
+    for r in routes:
+        impl = r["impl"]
+        assert impl["status"] in ("active", "parked", "stub"), impl
+        if impl["status"] == "active":
+            assert impl["path"], f"{r['id']} 写了 active 却没给 path"
+            assert os.path.exists(impl["path"]), \
+                f"{r['id']} 写了 active，但 impl.path 不存在：{impl['path']}"
+        if impl["status"] == "parked":
+            assert impl["path"], f"{r['id']} 写了 parked 却没给 path（归档在哪）"
 
     # 至少要有一条零显存路线——它和吃显存的路线不是备选关系
     assert any(r["needs"]["vram_gb"] == 0 for r in routes), "没有零显存路线"
