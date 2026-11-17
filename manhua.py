@@ -240,7 +240,9 @@ def main():
     ap = argparse.ArgumentParser(description="出图调度器：镜头表 -> 批量出图")
     ap.add_argument("--shots", required=True, help="镜头表 JSON 路径")
     ap.add_argument("--backend", choices=["comfy", "neoforge"], default="comfy")
-    ap.add_argument("--out", default="out", help="输出目录")
+    ap.add_argument("--out", default=os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), os.pardir, "work", "manhua"),
+        help="输出目录（默认 work/manhua/，不再落在当前工作目录）")
     ap.add_argument("--limit", type=int, default=0, help="只跑前 N 镜（0=全部）")
     ap.add_argument("--dry-run", action="store_true", help="不落盘，只打印")
     args = ap.parse_args()

@@ -39,7 +39,9 @@ def _act(kind, ok, detail):
 def fix_dirs(base_dir, manifests, dry=False):
     """补上该有的目录：work/、以及每个内核算出来的出图目录。"""
     made, failed = [], []
-    targets = [os.path.join(base_dir, "work")]
+    work = os.path.join(base_dir, "work")
+    targets = [work, os.path.join(work, "reports"),
+               os.path.join(work, "images"), os.path.join(work, "logs")]
     for m in manifests:
         if m.get("outputs"):
             targets.append(m["outputs"])
@@ -251,7 +253,7 @@ def report_md(actions, items, level, summary, base_dir, dry=False):
 
 
 def write_report(actions, items, level, summary, base_dir, dry=False):
-    out_dir = os.path.join(base_dir, "work")
+    out_dir = os.path.join(base_dir, "work", "reports")
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, time.strftime("repair-%Y%m%d-%H%M%S.md"))
     with open(path, "w", encoding="utf-8") as f:

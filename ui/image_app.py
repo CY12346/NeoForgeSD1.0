@@ -51,6 +51,11 @@ WORK = os.path.abspath(os.environ.get("NEOFORGE_IMAGE_WORK")
                        or os.environ.get("NEOFORGE_WORK")
                        or os.path.join(ROOT, os.pardir, "work"))
 os.makedirs(WORK, exist_ok=True)
+# 出图与日志分家：work 根只留 history_image.json 这类小状态文件。
+IMG_OUT = os.path.abspath(os.environ.get("NEOFORGE_IMAGE_OUT") or os.path.join(WORK, "images"))
+LOG_DIR = os.path.join(WORK, "logs")
+os.makedirs(IMG_OUT, exist_ok=True)
+os.makedirs(LOG_DIR, exist_ok=True)
 HISTORY_FILE = os.path.join(WORK, "history_image.json")
 
 JOBS = {}
@@ -151,6 +156,7 @@ def sd_catalog(force=False):
 def sd_status():
     online = sd_alive()
     st = {"online": online, "api": SD_API, "sd_home": SD_HOME, "work": WORK,
+          "images": IMG_OUT,
           "port": PORT, "model": None, "models": [], "samplers": [], "schedulers": [],
           "upscalers": [], "loras": [], "opts": {}, "backend": dict(START)}
     if START["state"] == "starting":
@@ -169,7 +175,7 @@ def _boot_backend():
     # 必须在子进程 CUDA 初始化前注入，所以走 env 而不是启动后再设。
     env = dict(os.environ, HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", PYTHONUTF8="1",
                PYTORCH_CUDA_ALLOC_CONF="expandable_segments:True")
-    log = os.path.join(WORK, "sd_server.log")
+    log = os.path.join(LOG_DIR, "sd_server.log")
     f = open(log, "ab")
     proc = None
     try:
@@ -394,7 +400,7 @@ def job_worker(job, payload, kind):
         if kind == "upscale":
             r = sd_post("/sdapi/v1/extra-single-image", payload)
             raw = base64.b64decode((r.get("image") or "").split(",")[-1])
-            p = os.path.join(WORK, f"{job['id']}_up.png")
+            p = os.path.join(IMG_OUT, f"{job['id']}_up.png")
             with open(p, "wb") as f:
                 f.write(raw)
             job["files"] = [p]
@@ -404,7 +410,7 @@ def job_worker(job, payload, kind):
             want = int(payload.get("n_iter") or 1)
             files = []
             for i, b in enumerate((resp.get("images") or [])[:want]):
-                p = os.path.join(WORK, f"{job['id']}_{i:02d}.png")
+                p = os.path.join(IMG_OUT, f"{job['id']}_{i:02d}.png")
                 with open(p, "wb") as f:
                     f.write(base64.b64decode(b.split(",")[-1]))
                 files.append(p)
@@ -553,7 +559,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path.startswith("/files/"):
             name = os.path.basename(urllib.request.unquote(self.path[7:]))
-            self._file(os.path.join(WORK, name))
+            fpath = os.path.join(IMG_OUT, name)
+            if not os.path.isfile(fpath):          # 兼容早期直接落在 work 根的图
+                fpath = os.path.join(WORK, name)
+            self._file(fpath)
             return
         self._json(404, {"error": "not found"})
 
@@ -643,8 +652,8 @@ class Handler(BaseHTTPRequestHandler):
 
         if self.path == "/api/open_folder":
             try:
-                os.startfile(WORK)  # noqa: S606  (Windows 资源管理器)
-                self._json(200, {"ok": True, "folder": WORK})
+                os.startfile(IMG_OUT)  # noqa: S606  (Windows 资源管理器)
+                self._json(200, {"ok": True, "folder": IMG_OUT})
             except Exception as e:
                 self._json(200, {"ok": False, "error": str(e)[:200]})
             return
@@ -715,7 +724,7 @@ def load_page():
 
 def main():
     print(f"NeoForgeSD 生图  → http://127.0.0.1:{PORT}/")
-    print(f"后端 SD API: {SD_API}   产物目录: {WORK}")
+    print(f"后端 SD API: {SD_API}   产物目录: {IMG_OUT}")
     print("SD 后端以 --nowebui 启动：没有 WebUI 页面，全部操作在本页")
     st = sd_status()
     print("SD 状态:", "在线" if st["online"] else "离线（页面可点『启动后端』）", "·", st.get("model"))

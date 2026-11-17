@@ -1618,7 +1618,7 @@ class Launcher(tk.Tk):
                 path, target=target, verify=True,
                 progress=lambda f, t: self.after(0, lambda f=f, t=t: self._bar_tick(f, t)),
                 log=lambda m: self.after(0, lambda m=m: self.logline(m)),
-                report_dir=WORK_DIR)
+                report_dir=os.path.join(WORK_DIR, "reports"))
             self.after(0, lambda r=res: self._install_done(r))
 
         threading.Thread(target=work, daemon=True).start()

@@ -241,7 +241,7 @@ def report_md(items, level, summary, base_dir):
 
 
 def write_report(items, level, summary, base_dir, out_dir=None):
-    out_dir = out_dir or os.path.join(base_dir, "work")
+    out_dir = out_dir or os.path.join(base_dir, "work", "reports")
     os.makedirs(out_dir, exist_ok=True)
     path = os.path.join(out_dir, time.strftime("selfcheck-%Y%m%d-%H%M%S.md"))
     with open(path, "w", encoding="utf-8") as f:
